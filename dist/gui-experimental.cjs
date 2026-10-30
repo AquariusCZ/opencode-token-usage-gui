@@ -1117,14 +1117,14 @@ var COPY = {
     cacheWrite: "\u7F13\u5B58\u5199",
     cacheHit: "\u7F13\u5B58\u547D\u4E2D",
     total: "\u5408\u8BA1",
-    tokens: "\u8BCD\u5143",
+    tokens: "tokens",
     requests: "\u6B21\u6A21\u578B\u8BF7\u6C42",
     rate: "\u6C47\u7387",
     rateManual: "\u624B\u52A8",
     rateAuto: "\u81EA\u52A8",
     rateFallback: "\u515C\u5E95",
     breakdown: "\u672C\u8F6E\u660E\u7EC6",
-    composition: "\u8BCD\u5143\u6784\u6210",
+    composition: "tokens \u6784\u6210",
     showDetails: "\u67E5\u770B\u7528\u91CF\u660E\u7EC6",
     hideDetails: "\u6536\u8D77\u7528\u91CF\u660E\u7EC6"
   }
