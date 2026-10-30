@@ -459,7 +459,7 @@ function createFooter(turn, view) {
   const values = {}
   const groups = {}
 
-  root.append(make("span", "tu-label", copy.turn))
+  root.append(make("span", "tu-label", turn && turn.session ? copy.session : copy.turn))
 
   const item = (key, text, className) => {
     const group = make("span", "tu-group")
@@ -510,7 +510,7 @@ function createFooter(turn, view) {
 
   const head = make("div", "tu-pop-head")
   const title = make("div", "tu-pop-title")
-  title.append(make("span", "tu-eyebrow", copy.breakdown))
+  title.append(make("span", "tu-eyebrow", turn && turn.session ? copy.sessionBreakdown : copy.breakdown))
   const totalLine = make("span", "tu-pop-total")
   const totalNum = make("span", "tu-total-num")
   const totalUnit = make("span", "tu-total-unit", copy.tokens)
@@ -654,6 +654,7 @@ function updateFooter(entry, turn, view) {
   setText(entry.hitValue, hit === null ? "—" : view.percent(hit))
 
   const parts = []
+  if (turn.session && turn.turns > 0) parts.push(`${view.int(turn.turns)} ${copy.turns}`)
   parts.push(`${view.int(turn.requests)} ${copy.requests}`)
   if (turn.durationMs > 0) parts.push(formatDuration(turn.durationMs))
   setText(entry.meta, parts.join(" · "))

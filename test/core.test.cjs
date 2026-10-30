@@ -18,6 +18,7 @@ const {
   normalizeRefreshMode,
   sameTotals,
   smoothingAlpha,
+  summarizeTurns,
   tokenComposition,
   tokenUsage,
   visibleMessages,
@@ -172,6 +173,96 @@ test("buildTurns respects the revert boundary", () => {
 
   assert.equal(turns.size, 1)
   assert.equal(turns.has("u2"), false)
+})
+
+test("summarizeTurns folds every completed turn into one session payload", () => {
+  const turns = new Map([
+    [
+      "u1",
+      {
+        totals: { input: 100, output: 20, reasoning: 5, cacheRead: 50, cacheWrite: 0, total: 175 },
+        cost: 0.0012,
+        requests: 3,
+        durationMs: 4_000,
+      },
+    ],
+    [
+      "u2",
+      {
+        totals: { input: 40, output: 10, reasoning: 0, cacheRead: 10, cacheWrite: 2, total: 62 },
+        cost: 0.0004,
+        requests: 2,
+        durationMs: 2_000,
+      },
+    ],
+  ])
+
+  const summary = summarizeTurns(turns)
+
+  assert.equal(summary.id, "__session__")
+  assert.equal(summary.session, true)
+  assert.deepEqual(summary.totals, {
+    input: 140,
+    output: 30,
+    reasoning: 5,
+    cacheRead: 60,
+    cacheWrite: 2,
+    total: 237,
+  })
+  assert.ok(Math.abs(summary.cost - 0.0016) < 1e-12)
+  assert.equal(summary.requests, 5)
+  assert.equal(summary.durationMs, 6_000)
+  assert.equal(summary.cacheHitRate, (60 / 202) * 100)
+  assert.deepEqual(summary.messageIds, [])
+  assert.equal(summary.turns, 2)
+})
+
+test("summarizeTurns of an empty map is empty", () => {
+  const summary = summarizeTurns(new Map())
+
+  assert.deepEqual(summary.totals, {
+    input: 0,
+    output: 0,
+    reasoning: 0,
+    cacheRead: 0,
+    cacheWrite: 0,
+    total: 0,
+  })
+  assert.equal(summary.cost, 0)
+  assert.equal(summary.requests, 0)
+  assert.equal(summary.durationMs, 0)
+  assert.equal(summary.cacheHitRate, null)
+  assert.equal(summary.turns, 0)
+})
+
+test("summarizeTurns ignores turns with no tokens and no cost", () => {
+  const turns = new Map([
+    [
+      "empty",
+      {
+        totals: { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        cost: 0,
+        requests: 0,
+        durationMs: 9_000,
+      },
+    ],
+    [
+      "real",
+      {
+        totals: { input: 7, output: 1, reasoning: 0, cacheRead: 2, cacheWrite: 0, total: 10 },
+        cost: 0.0001,
+        requests: 1,
+        durationMs: 1_500,
+      },
+    ],
+  ])
+
+  const summary = summarizeTurns(turns)
+
+  assert.equal(summary.turns, 1)
+  assert.equal(summary.totals.total, 10)
+  assert.equal(summary.requests, 1)
+  assert.equal(summary.durationMs, 1_500)
 })
 
 test("cacheHitRate uses prompt tokens only", () => {

@@ -158,6 +158,35 @@ var require_core = __commonJS({
       }
       return turns;
     }
+    function summarizeTurns2(turns) {
+      const totals = emptyTotals();
+      let cost = 0;
+      let requests = 0;
+      let durationMs = 0;
+      let count = 0;
+      if (turns && typeof turns.values === "function") {
+        for (const turn of turns.values()) {
+          if (!turn || !turn.totals) continue;
+          if (turn.totals.total <= 0 && turn.cost <= 0) continue;
+          addUsage(totals, turn.totals);
+          cost += finite2(turn.cost);
+          requests += finite2(turn.requests);
+          durationMs += Math.max(0, finite2(turn.durationMs));
+          count += 1;
+        }
+      }
+      return {
+        id: "__session__",
+        session: true,
+        totals,
+        cost,
+        requests,
+        durationMs,
+        cacheHitRate: cacheHitRate2(totals),
+        messageIds: [],
+        turns: count
+      };
+    }
     function sameTotals2(a, b) {
       return METRICS2.every((key) => Math.round(finite2(a && a[key])) === Math.round(finite2(b && b[key])));
     }
@@ -228,6 +257,7 @@ var require_core = __commonJS({
       normalizeRefreshMode: normalizeRefreshMode2,
       sameTotals: sameTotals2,
       smoothingAlpha: smoothingAlpha2,
+      summarizeTurns: summarizeTurns2,
       tokenComposition,
       tokenUsage,
       visibleMessages
@@ -745,7 +775,7 @@ var require_footer = __commonJS({
       root.setAttribute("aria-live", "off");
       const values = {};
       const groups = {};
-      root.append(make("span", "tu-label", copy.turn));
+      root.append(make("span", "tu-label", turn && turn.session ? copy.session : copy.turn));
       const item = (key, text, className) => {
         const group = make("span", "tu-group");
         const wrap = make("span", className ? `tu-item ${className}` : "tu-item");
@@ -788,7 +818,7 @@ var require_footer = __commonJS({
       info.setAttribute("aria-describedby", pop.id);
       const head = make("div", "tu-pop-head");
       const title = make("div", "tu-pop-title");
-      title.append(make("span", "tu-eyebrow", copy.breakdown));
+      title.append(make("span", "tu-eyebrow", turn && turn.session ? copy.sessionBreakdown : copy.breakdown));
       const totalLine = make("span", "tu-pop-total");
       const totalNum = make("span", "tu-total-num");
       const totalUnit = make("span", "tu-total-unit", copy.tokens);
@@ -913,6 +943,7 @@ var require_footer = __commonJS({
       entry.hitCell.hidden = hit === null;
       setText2(entry.hitValue, hit === null ? "\u2014" : view.percent(hit));
       const parts = [];
+      if (turn.session && turn.turns > 0) parts.push(`${view.int(turn.turns)} ${copy.turns}`);
       parts.push(`${view.int(turn.requests)} ${copy.requests}`);
       if (turn.durationMs > 0) parts.push(formatDuration(turn.durationMs));
       setText2(entry.meta, parts.join(" \xB7 "));
@@ -1148,7 +1179,8 @@ var {
   normalizePopoverSide,
   normalizeRefreshMode,
   sameTotals,
-  smoothingAlpha
+  smoothingAlpha,
+  summarizeTurns
 } = require_core();
 var {
   CSS,
@@ -1179,6 +1211,7 @@ var FX_TIMEOUT_MS = 8e3;
 var COPY = {
   en: {
     turn: "This turn",
+    session: "Session",
     input: "Input",
     output: "Output",
     reasoning: "Reasoning",
@@ -1193,12 +1226,15 @@ var COPY = {
     rateAuto: "auto",
     rateFallback: "fallback",
     breakdown: "Turn breakdown",
+    sessionBreakdown: "Session breakdown",
+    turns: "turns",
     composition: "Token composition",
     showDetails: "Show token breakdown",
     hideDetails: "Hide token breakdown"
   },
   zh: {
     turn: "\u672C\u8F6E",
+    session: "\u672C\u6B21\u4F1A\u8BDD",
     input: "\u8F93\u5165",
     output: "\u8F93\u51FA",
     reasoning: "\u63A8\u7406",
@@ -1213,6 +1249,8 @@ var COPY = {
     rateAuto: "\u81EA\u52A8",
     rateFallback: "\u515C\u5E95",
     breakdown: "\u672C\u8F6E\u660E\u7EC6",
+    sessionBreakdown: "\u4F1A\u8BDD\u660E\u7EC6",
+    turns: "\u8F6E",
     composition: "tokens \u6784\u6210",
     showDetails: "\u67E5\u770B\u7528\u91CF\u660E\u7EC6",
     hideDetails: "\u6536\u8D77\u7528\u91CF\u660E\u7EC6"
@@ -1299,6 +1337,11 @@ function findComposerFace(scroll) {
   if (faces.length === 0) return null;
   return faces.reduce((best, item) => area(item) > area(best) ? item : best, faces[0]);
 }
+var hasVisibleQueue = () => {
+  const panel = document.querySelector('[data-component="session-queue-panel"]');
+  if (!panel || !isVisible(panel)) return false;
+  return Boolean(panel.querySelector('[data-component="session-queue-row"]'));
+};
 function contentTarget(row) {
   return row.closest('[data-slot="session-turn-assistant-content"]') || row.querySelector('[data-slot="session-turn-assistant-content"]') || row.closest('[data-slot="session-turn-message-container"]') || row.querySelector('[data-slot="session-turn-message-content"]') || row;
 }
@@ -1571,7 +1614,9 @@ module.exports = Plugin.define({
         }
         const turnIds = Array.from(turns.keys());
         activeTurnId = running ? turnIds[turnIds.length - 1] : null;
-        const liveHost = running ? ensureLiveHost(scroll) : null;
+        const summary = summarizeTurns(turns);
+        const hasSummary = !running && !hasVisibleQueue() && (summary.totals.total > 0 || summary.cost > 0);
+        const liveHost = running || hasSummary ? ensureLiveHost(scroll) : null;
         const byMessage = /* @__PURE__ */ new Map();
         known = new Set(turns.keys());
         for (const [turnId, turn] of turns) {
@@ -1633,6 +1678,30 @@ module.exports = Plugin.define({
           if (entry.targetEl !== target || !entry.root.isConnected || entry.root.parentElement !== target) {
             target.appendChild(entry.root);
             entry.targetEl = target;
+            if (entry.isOpen()) entry.reposition();
+          }
+        }
+        if (hasSummary && liveHost) {
+          const key = `${session.id}:__summary__`;
+          seen.add(key);
+          let entry = state.get(key);
+          if (!entry) {
+            entry = createFooter(summary, view);
+            entry.target = { ...summary.totals };
+            entry.current = { ...summary.totals };
+            entry.from = { ...summary.totals };
+            entry.startedAt = 0;
+            entry.scrollEl = scroll;
+            bindTooltip(entry, view);
+            state.set(key, entry);
+            paint(entry, view);
+          } else {
+            entry.scrollEl = scroll;
+            applyTurn(entry, summary, view, animate);
+          }
+          if (entry.targetEl !== liveHost || entry.root.parentElement !== liveHost) {
+            liveHost.appendChild(entry.root);
+            entry.targetEl = liveHost;
             if (entry.isOpen()) entry.reposition();
           }
         }

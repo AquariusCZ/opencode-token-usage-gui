@@ -14,6 +14,7 @@ const {
   normalizeRefreshMode,
   sameTotals,
   smoothingAlpha,
+  summarizeTurns,
 } = require("./core.cjs")
 const {
   CSS,
@@ -46,6 +47,7 @@ const FX_TIMEOUT_MS = 8000
 const COPY = {
   en: {
     turn: "This turn",
+    session: "Session",
     input: "Input",
     output: "Output",
     reasoning: "Reasoning",
@@ -60,12 +62,15 @@ const COPY = {
     rateAuto: "auto",
     rateFallback: "fallback",
     breakdown: "Turn breakdown",
+    sessionBreakdown: "Session breakdown",
+    turns: "turns",
     composition: "Token composition",
     showDetails: "Show token breakdown",
     hideDetails: "Hide token breakdown",
   },
   zh: {
     turn: "本轮",
+    session: "本次会话",
     input: "输入",
     output: "输出",
     reasoning: "推理",
@@ -80,6 +85,8 @@ const COPY = {
     rateAuto: "自动",
     rateFallback: "兜底",
     breakdown: "本轮明细",
+    sessionBreakdown: "会话明细",
+    turns: "轮",
     composition: "tokens 构成",
     showDetails: "查看用量明细",
     hideDetails: "收起用量明细",
@@ -184,6 +191,16 @@ function findComposerFace(scroll) {
   }
   if (faces.length === 0) return null
   return faces.reduce((best, item) => (area(item) > area(best) ? item : best), faces[0])
+}
+
+/**
+ * True while the composer's queue panel is on screen and has at least one row.
+ * The panel stays mounted (hidden) with no rows when the queue is empty.
+ */
+const hasVisibleQueue = () => {
+  const panel = document.querySelector('[data-component="session-queue-panel"]')
+  if (!panel || !isVisible(panel)) return false
+  return Boolean(panel.querySelector('[data-component="session-queue-row"]'))
 }
 
 function contentTarget(row) {
@@ -523,7 +540,12 @@ module.exports = Plugin.define({
         }
         const turnIds = Array.from(turns.keys())
         activeTurnId = running ? turnIds[turnIds.length - 1] : null
-        const liveHost = running ? ensureLiveHost(scroll) : null
+        const summary = summarizeTurns(turns)
+        const hasSummary =
+          !running &&
+          !hasVisibleQueue() &&
+          (summary.totals.total > 0 || summary.cost > 0)
+        const liveHost = running || hasSummary ? ensureLiveHost(scroll) : null
 
         const byMessage = new Map()
         known = new Set(turns.keys())
@@ -597,6 +619,32 @@ module.exports = Plugin.define({
           ) {
             target.appendChild(entry.root)
             entry.targetEl = target
+            if (entry.isOpen()) entry.reposition()
+          }
+        }
+
+        if (hasSummary && liveHost) {
+          const key = `${session.id}:__summary__`
+          seen.add(key)
+          let entry = state.get(key)
+          if (!entry) {
+            entry = createFooter(summary, view)
+            entry.target = { ...summary.totals }
+            entry.current = { ...summary.totals }
+            entry.from = { ...summary.totals }
+            entry.startedAt = 0
+            entry.scrollEl = scroll
+            bindTooltip(entry, view)
+            state.set(key, entry)
+            paint(entry, view)
+          } else {
+            entry.scrollEl = scroll
+            applyTurn(entry, summary, view, animate)
+          }
+
+          if (entry.targetEl !== liveHost || entry.root.parentElement !== liveHost) {
+            liveHost.appendChild(entry.root)
+            entry.targetEl = liveHost
             if (entry.isOpen()) entry.reposition()
           }
         }

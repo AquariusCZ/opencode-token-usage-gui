@@ -217,6 +217,41 @@ function buildTurns(messages, revertMessageID) {
   return turns
 }
 
+/**
+ * Fold every completed turn into one synthetic footer payload. Turns with no
+ * tokens and no cost (an empty steer or a failed request) are ignored so they
+ * do not inflate the turn count.
+ */
+function summarizeTurns(turns) {
+  const totals = emptyTotals()
+  let cost = 0
+  let requests = 0
+  let durationMs = 0
+  let count = 0
+  if (turns && typeof turns.values === "function") {
+    for (const turn of turns.values()) {
+      if (!turn || !turn.totals) continue
+      if (turn.totals.total <= 0 && turn.cost <= 0) continue
+      addUsage(totals, turn.totals)
+      cost += finite(turn.cost)
+      requests += finite(turn.requests)
+      durationMs += Math.max(0, finite(turn.durationMs))
+      count += 1
+    }
+  }
+  return {
+    id: "__session__",
+    session: true,
+    totals,
+    cost,
+    requests,
+    durationMs,
+    cacheHitRate: cacheHitRate(totals),
+    messageIds: [],
+    turns: count,
+  }
+}
+
 function sameTotals(a, b) {
   return METRICS.every((key) => Math.round(finite(a && a[key])) === Math.round(finite(b && b[key])))
 }
@@ -293,6 +328,7 @@ module.exports = {
   normalizeRefreshMode,
   sameTotals,
   smoothingAlpha,
+  summarizeTurns,
   tokenComposition,
   tokenUsage,
   visibleMessages,

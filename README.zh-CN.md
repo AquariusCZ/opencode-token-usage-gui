@@ -68,6 +68,7 @@
   并自动夹在浏览器窗口可视区域内，滚动/缩放时跟随。
 - **执行中也有胶囊。** 思考或工具执行时，胶囊位于 composer dock 中、排队消息面板和输入卡片上方；从 0 实时更新，
   结束后归位到回复下方。已完成轮次保留各自胶囊。
+- **任务完成后汇总。** 会话空闲且没有排队消息时，输入框上方切换为「本次会话」胶囊，汇总所有已完成轮次的 token、费用、缓存命中、请求数和活跃时间；悬停看会话明细；下一轮开始后切换回实时胶囊。
 - **位于应用普通层叠之上。** 明细卡渲染到 `document.body` 的 fixed portal，z-index 为 2147483000，位于时间线、
   后续消息和输入区之上，普通层叠上下文无法遮住或裁掉它。应用自身的 modal/对话框仍可能盖在它上面。
 - **更容易对准。** 可见行本身是一块带内边距的胶囊，行尾有独立 ⓘ 按钮，点击热区比图标更大，不用再
@@ -282,6 +283,7 @@ user message
 3. 找到渲染出来的 assistant 内容容器（`[data-slot="session-turn-assistant-content"]`），把 footer 节点挂进去；
 4. 100ms 采样（空闲 1000ms）保持数据新鲜；`MutationObserver` 在应用重渲染时把 footer 挂回去；`requestAnimationFrame` 做数字动画；
 5. 应用把 `session.status` 报为 `running`（思考或工具执行）时，当前轮的 footer 成为 `[data-component="session-composer-dock"]` 里 `z-[70]` 列的**第一个流式子元素**，位于排队消息区（queue grow）和 `[data-slot="composer-morph"]` **上方**：排队面板的 12px 负外边距只会压到输入卡片上，不会压到胶囊；dock 的 ResizeObserver 会同步时间线下边距；morph 的面板飞行动画（`data-moving` + `overflow-clip`）裁不到 morph 之外的节点。从 0 开始实时更新，本轮结束后归位到回复内容下方。明细卡是 `document.body` 级的 fixed portal（z-index 2147483000），优先配置方向（默认左侧），其次下方，最后上方；窗口隐藏时暂停采样。
+6. 会话空闲且没有可见排队消息时，dock 显示由 `summarizeTurns(turns)` 生成的「本次会话」合成 footer：汇总所有已完成轮次，meta 行带轮数；下一轮开始后由实时胶囊替换。
 
 GUI 插件 API 目前没有官方的「消息底部插槽」，所以最后一步是 DOM 注入。这是整个插件最脆的地方：未来
 OpenCode 如果改了 slot 名，footer 会消失（插件只打印一次警告），不会污染时间线。选择器和聚合逻辑分别隔离在
@@ -310,6 +312,9 @@ OpenCode 如果改了 slot 名，footer 会消失（插件只打印一次警告�
 
 **为什么按轮，不按每条消息？**
 一轮里可能有很多 assistant 请求和工具循环；按单条消息显示会漏掉大部分消耗。想要更多指标可以开 `detailed`。
+
+**整个会话的总量在哪看？**
+会话空闲且没有排队消息时，输入框上方的「本次会话」胶囊会汇总每一轮；悬停可看会话明细。各轮胶囊仍保留在对话里。
 
 **能看到推理 token 吗？**
 可以：`detailed: true`，或者直接打开明细卡。推理 token 永远在卡片里。

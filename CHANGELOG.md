@@ -2,6 +2,9 @@
 
 ## 0.3.0 — 2026-10-30
 
+- **Session summary at the end.** When a session is idle with no queued message, the composer dock shows a
+  synthetic “Session” capsule and card aggregating every completed turn (tokens, cost, cache hit, requests,
+  active time, turn count). Per-turn capsules remain; a new turn replaces it with the live capsule.
 - **A real breakdown card replaces the native `title` tooltip.** Hovering or focusing the footer now opens a
   theme-aware card instead of the browser's delayed, unstyleable tooltip.
 - **A target you can actually hit.** The footer is a padded pill (about 30 px tall) with a dedicated info button
@@ -41,7 +44,7 @@
   the vertical-card hover bridge anchors to the info button; Escape only closes a pinned card from non-editing
   surfaces — the listener is bubble-phase and `defaultPrevented`-aware, and leaves Escape to text fields,
   contenteditable (including plaintext-only) editors, selects, menus/listboxes, dialogs and question/elicitation
-  docks. Added a no-fit placement test and a wrapped-footer info-anchor test (31 tests).
+  docks. Added a no-fit placement test and a wrapped-footer info-anchor test (34 tests).
 - Refreshed the interactive mock and screenshot; added an in-page light/dark toggle.
 
 ## 0.2.2 — 2026-10-30

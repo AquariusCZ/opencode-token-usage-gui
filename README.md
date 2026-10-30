@@ -75,6 +75,10 @@ numbers that actually change the bill.
 - **Live from the first token.** While a turn is thinking or running tools, its capsule sits in the composer dock,
   above the queued-message panel and the composer card. It starts at zero and updates live, then moves under the
   turn when the turn settles. Completed turns keep their capsules.
+- **Session summary when the work is done.** When the session is idle and no message is queued, the composer dock
+  switches to a session-wide capsule labeled “Session”: total tokens, cost, cache hit, requests and active time
+  across every completed turn. Hover it for the full session card; per-turn capsules stay in the transcript.
+  Starting a new turn replaces it with the live capsule.
 - **Above the app's normal layers.** The details card is rendered in a fixed body portal at z-index 2147483000,
   above the timeline, later messages and the composer, so normal stacking contexts cannot cover or clip it.
   An app-level modal/dialog may still sit above it.
@@ -318,6 +322,9 @@ user message
    `overflow-clip`) cannot clip a node outside the morph. The line starts at zero and updates live; when the turn
    settles it moves into the assistant content. Hovering opens the fixed body-portal card at z-index 2147483000,
    preferring the configured side (left by default), then below, then above. The follow timer skips a hidden window.
+6. When the session is idle with no visible queue, the dock shows a synthetic “Session” footer built by
+   `summarizeTurns(turns)`: sums of all completed turns, with a turn count in the meta line. It is replaced by the
+   live capsule when the next turn starts.
 
 There is no official message-footer slot in the GUI plugin API, so the last step is DOM injection. That is the
 intentionally fragile part: if a future OpenCode release renames the slot, the footer disappears (the plugin logs
@@ -350,6 +357,10 @@ No session data is sent anywhere. The only network request is the opt-in daily U
 **Why per-turn instead of per-message?**
 A turn can contain many assistant requests and tool loops. Per-message numbers look smaller but are misleading.
 Use `detailed` if you want more metrics on the visible line.
+
+**Where is the total for the whole session?**
+When the session is idle and nothing is queued, the composer dock shows a “Session” capsule summing every turn;
+hover it for the session breakdown. Per-turn capsules remain in the conversation.
 
 **Can I see reasoning tokens?**
 Yes: set `detailed: true`, or open the details card. Reasoning is always in the card.
