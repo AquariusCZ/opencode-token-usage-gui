@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "opencode-token-usage-gui",
+  "version": "0.1.0",
+  "description": "Per-turn token, cache and cost footer for OpenCode Desktop.",
+  "type": "module",
+  "license": "MIT",
+  "author": "AquariusCZ (https://github.com/AquariusCZ)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AquariusCZ/opencode-token-usage-gui.git"
+  },
+  "homepage": "https://github.com/AquariusCZ/opencode-token-usage-gui#readme",
+  "bugs": {
+    "url": "https://github.com/AquariusCZ/opencode-token-usage-gui/issues"
+  },
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "opencode-desktop",
+    "token-usage",
+    "deepseek",
+    "cache",
+    "cost"
+  ],
+  "exports": {
+    ".": "./index.js",
+    "./gui-experimental": "./dist/gui-experimental.cjs"
+  },
+  "files": [
+    "index.js",
+    "dist",
+    "assets",
+    "README.md",
+    "README.zh-CN.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test",
+    "check": "npm run build && npm test",
+    "prepublishOnly": "npm run check"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
