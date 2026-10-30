@@ -1,4 +1,4 @@
-/*! opencode-token-usage-gui v0.2.0 | MIT | https://github.com/AquariusCZ/opencode-token-usage-gui */
+/*! opencode-token-usage-gui v0.2.2 | MIT | https://github.com/AquariusCZ/opencode-token-usage-gui */
 "use strict";
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
@@ -29,6 +29,15 @@ var require_core = __commonJS({
       const number = Number(value);
       if (!Number.isFinite(number)) return fallback;
       return Math.min(max, Math.max(min, number));
+    }
+    function smoothingAlpha2(dtMs, tauMs) {
+      const dt = Math.max(0, finite2(dtMs));
+      const tau = Math.max(1, finite2(tauMs));
+      return Math.min(1, 1 - Math.exp(-dt / tau));
+    }
+    function approachValue2(current, target, alpha) {
+      const a = Math.min(1, Math.max(0, finite2(alpha)));
+      return finite2(current) + (finite2(target) - finite2(current)) * a;
     }
     function normalizeCurrency2(value, locale) {
       const code = String(value || "CNY").toUpperCase();
@@ -185,6 +194,7 @@ var require_core = __commonJS({
     module2.exports = {
       METRICS: METRICS2,
       addUsage,
+      approachValue: approachValue2,
       buildTurns: buildTurns2,
       cacheHitRate: cacheHitRate2,
       clampNumber: clampNumber2,
@@ -197,6 +207,7 @@ var require_core = __commonJS({
       formatPercent,
       normalizeCurrency: normalizeCurrency2,
       sameTotals: sameTotals2,
+      smoothingAlpha: smoothingAlpha2,
       tokenUsage,
       visibleMessages
     };
@@ -207,6 +218,7 @@ var require_core = __commonJS({
 var { Plugin, Style } = require("@opencode/plugin/gui");
 var {
   METRICS,
+  approachValue,
   buildTurns,
   cacheHitRate,
   clampNumber,
@@ -215,7 +227,8 @@ var {
   formatDuration,
   formatMoney,
   normalizeCurrency,
-  sameTotals
+  sameTotals,
+  smoothingAlpha
 } = require_core();
 var FOOTER_ATTR = "data-token-usage";
 var STYLE_ID = "opencode-token-usage-gui-style";
@@ -225,6 +238,13 @@ var MIN_REFRESH_MS = 16;
 var MAX_REFRESH_MS = 5e3;
 var DEFAULT_TWEEN_MS = 550;
 var MAX_TWEEN_MS = 2e3;
+var DEFAULT_SAMPLE_MS = 100;
+var MIN_SAMPLE_MS = 50;
+var MAX_SAMPLE_MS = 1e3;
+var DEFAULT_SMOOTH_MS = 250;
+var MIN_SMOOTH_MS = 50;
+var MAX_SMOOTH_MS = 2e3;
+var IDLE_SAMPLE_MS = 1e3;
 var MUTATION_DELAY_MS = 120;
 var DEFAULT_USD_TO_CNY = 6.68;
 var FX_CACHE_KEY = "opencode-token-usage-gui:fx";
@@ -493,6 +513,11 @@ function applyTurn(entry, turn, view, animate) {
     paint(entry, view);
     return;
   }
+  if (view.continuous) {
+    entry.target = next;
+    view.ensureAnimation();
+    return;
+  }
   entry.from = { ...entry.current };
   entry.target = next;
   entry.startedAt = performance.now();
@@ -514,9 +539,13 @@ module.exports = Plugin.define({
     const compact = options.compact === true;
     const detailed = options.detailed === true;
     const showCost = options.showCost !== false;
+    const refreshMode = options.refreshMode === "interval" ? "interval" : "continuous";
+    const continuous = refreshMode === "continuous";
     const refreshMs = clampNumber(options.refreshMs, MIN_REFRESH_MS, MAX_REFRESH_MS, DEFAULT_REFRESH_MS);
     const tweenMs = clampNumber(options.tweenMs, 0, MAX_TWEEN_MS, DEFAULT_TWEEN_MS);
-    const animate = options.animate !== false && tweenMs > 0 && !reducedMotion();
+    const sampleMs = clampNumber(options.sampleMs, MIN_SAMPLE_MS, MAX_SAMPLE_MS, DEFAULT_SAMPLE_MS);
+    const smoothMs = clampNumber(options.smoothMs, MIN_SMOOTH_MS, MAX_SMOOTH_MS, DEFAULT_SMOOTH_MS);
+    const animate = options.animate !== false && !reducedMotion() && (continuous || tweenMs > 0);
     const currency = normalizeCurrency(options.currency, locale);
     const autoRate = String(options.usdToCny).toLowerCase() === "auto";
     const manualRate = finite(options.usdToCny) > 0 ? finite(options.usdToCny) : DEFAULT_USD_TO_CNY;
@@ -533,6 +562,7 @@ module.exports = Plugin.define({
       compact,
       detailed,
       showCost,
+      continuous,
       currency,
       money: (usd) => formatMoney(
         finite(usd) * (currency === "CNY" ? rate.value : 1),
@@ -553,7 +583,10 @@ module.exports = Plugin.define({
       int: (value) => intFmt.format(Math.round(finite(value))),
       percent: (value) => value === null || value === void 0 || !Number.isFinite(Number(value)) ? "\u2014" : pctFmt.format(Number(value) / 100),
       ensureAnimation: () => {
-        if (animate && frame === void 0) frame = requestAnimationFrame(tick);
+        if (animate && frame === void 0) {
+          lastFrame = 0;
+          frame = requestAnimationFrame(tick);
+        }
       }
     };
     let styleNode = null;
@@ -567,8 +600,9 @@ module.exports = Plugin.define({
       styleNode = installStyle();
     }
     const state = /* @__PURE__ */ new Map();
-    let timer;
+    let sampleTimer;
     let frame;
+    let lastFrame = 0;
     let mutationTimer;
     let observedScroll = null;
     let warned = false;
@@ -592,6 +626,29 @@ module.exports = Plugin.define({
       observer.observe(scroll, { childList: true, subtree: true });
     };
     const tick = (now) => {
+      if (continuous) {
+        const dt = lastFrame ? Math.max(0, now - lastFrame) : 16.67;
+        lastFrame = now;
+        const alpha = smoothingAlpha(dt, smoothMs);
+        let active2 = false;
+        for (const entry of state.values()) {
+          let done = true;
+          for (const key of METRICS) {
+            const target = entry.target[key];
+            if (Math.abs(target - entry.current[key]) < 0.5) {
+              entry.current[key] = target;
+            } else {
+              entry.current[key] = approachValue(entry.current[key], target, alpha);
+              done = false;
+            }
+          }
+          paint(entry, view);
+          if (!done) active2 = true;
+        }
+        frame = active2 ? requestAnimationFrame(tick) : void 0;
+        if (!active2) lastFrame = 0;
+        return;
+      }
       let active = false;
       for (const entry of state.values()) {
         if (!entry.startedAt) continue;
@@ -685,6 +742,26 @@ module.exports = Plugin.define({
         warn(error);
       }
     };
+    const sampleInterval = () => {
+      if (!continuous) return refreshMs;
+      const session = ctx.sessions.current();
+      const data = session && session.server && session.server.data;
+      const status = data && data.session && data.session.status;
+      if (typeof status !== "function" || !session.id) return sampleMs;
+      try {
+        return status.call(data.session, session.id) === "running" ? sampleMs : Math.max(sampleMs, IDLE_SAMPLE_MS);
+      } catch {
+        return sampleMs;
+      }
+    };
+    const scheduleSample = () => {
+      if (disposed) return;
+      sampleTimer = setTimeout(() => {
+        if (disposed) return;
+        refresh();
+        scheduleSample();
+      }, sampleInterval());
+    };
     const refreshDetails = () => {
       if (disposed) return;
       for (const entry of state.values()) {
@@ -744,7 +821,7 @@ module.exports = Plugin.define({
     };
     const cleanup = () => {
       disposed = true;
-      clearInterval(timer);
+      clearTimeout(sampleTimer);
       if (mutationTimer) clearTimeout(mutationTimer);
       if (frame !== void 0) cancelAnimationFrame(frame);
       if (observer) observer.disconnect();
@@ -764,7 +841,7 @@ module.exports = Plugin.define({
     window[GUARD_KEY] = { cleanup };
     document.addEventListener("visibilitychange", onVisibilityChange);
     refresh();
-    timer = setInterval(refresh, refreshMs);
+    scheduleSample();
     void loadRate();
     return cleanup;
   }

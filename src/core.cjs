@@ -33,6 +33,23 @@ function clampNumber(value, min, max, fallback) {
 }
 
 /**
+ * Frame-rate independent easing factor for a first-order lag filter.
+ * alpha = 1 - exp(-dt / tau), so the same tau behaves the same at 30, 60 or
+ * 120 Hz. A new target never resets the displayed value; it only changes the
+ * point the value is easing toward.
+ */
+function smoothingAlpha(dtMs, tauMs) {
+  const dt = Math.max(0, finite(dtMs))
+  const tau = Math.max(1, finite(tauMs))
+  return Math.min(1, 1 - Math.exp(-dt / tau))
+}
+
+function approachValue(current, target, alpha) {
+  const a = Math.min(1, Math.max(0, finite(alpha)))
+  return finite(current) + (finite(target) - finite(current)) * a
+}
+
+/**
  * Resolve the display currency. "auto" follows the UI language: Chinese gets
  * CNY, everything else gets USD (the app's native billing currency).
  */
@@ -231,6 +248,7 @@ function formatDuration(milliseconds) {
 module.exports = {
   METRICS,
   addUsage,
+  approachValue,
   buildTurns,
   cacheHitRate,
   clampNumber,
@@ -243,6 +261,7 @@ module.exports = {
   formatPercent,
   normalizeCurrency,
   sameTotals,
+  smoothingAlpha,
   tokenUsage,
   visibleMessages,
 }

@@ -58,7 +58,9 @@ numbers that actually change the bill.
 ## Features
 
 - **Per-turn, not per-message.** One footer per turn, aggregating every assistant request and tool loop.
-- **Live count-up.** Numbers tween like the CLI's counter instead of jumping every 500 ms. Respects
+- **Live count-up.** Continuous mode samples the store at 100 ms while running and follows the target with a
+  60 Hz first-order lag; a new sample changes the target without restarting the animation, so the counter reads
+  as one continuous motion. An `interval` mode keeps the old discrete refresh + tween behavior. Respects
   `prefers-reduced-motion`.
 - **Cache-aware.** Shows cache reads and the cache hit rate — the metric that explains most of the cost difference
   on DeepSeek and Anthropic models.
@@ -136,6 +138,9 @@ Options go in the plugin entry of `opencode.json(c)`:
         "detailed": false,
         "showCost": true,
         "animate": true,
+        "refreshMode": "continuous",
+        "sampleMs": 100,
+        "smoothMs": 250,
         "refreshMs": 500,
         "tweenMs": 550,
         "currency": "CNY",
@@ -151,9 +156,12 @@ Options go in the plugin entry of `opencode.json(c)`:
 | `compact` | `false` | Show only input, output, total and cost. |
 | `detailed` | `false` | Also show reasoning tokens and cache writes on the visible line. |
 | `showCost` | `true` | Show the per-turn cost. |
-| `animate` | `true` | Tween the numbers instead of jumping. Set `false` or `tweenMs: 0` to snap. |
-| `refreshMs` | `500` | Refresh interval, clamped to 16–5000 ms. `16.67` = 60 Hz; much higher CPU, intended for experiments. |
-| `tweenMs` | `550` | Count-up duration, clamped to 0–2000 ms. `0` disables the animation. |
+| `animate` | `true` | Animate the numbers. Set `false` to snap in both modes. |
+| `refreshMode` | `"continuous"` | `"continuous"` (fluid counter) or `"interval"` (discrete refresh + tween). |
+| `sampleMs` | `100` | Continuous mode: data sample interval while the session is running, clamped to 50–1000 ms. Idle sessions sample at 1000 ms. |
+| `smoothMs` | `250` | Continuous mode: first-order lag time constant, clamped to 50–2000 ms. Larger = softer/slower. |
+| `refreshMs` | `500` | Interval mode: refresh interval, clamped to 16–5000 ms. `16.67` = 60 Hz; intended for experiments. |
+| `tweenMs` | `550` | Interval mode: tween duration, clamped to 0–2000 ms. |
 | `currency` | `"CNY"` | `"CNY"`, `"USD"`, or `"auto"`. `auto` uses CNY for a Chinese UI and USD otherwise. |
 | `usdToCny` | `6.68` | A number (manual rate, no network) or `"auto"` (daily cached rate; see below). |
 
@@ -190,16 +198,31 @@ Exchange rate 6.68 · fallback
 
 Set `usdToCny` to your actual billing rate if you want the number to match your invoice exactly.
 
-### Refresh rate
+### Refresh modes
 
-- `refreshMs` defaults to `500` and is clamped to `16–5000`. Lower means fresher numbers; higher means less CPU.
-  `16.67` (60 Hz) is allowed for experiments, but polls the session store every frame and is not recommended for normal use.
-- `tweenMs` defaults to `550` and is clamped to `0–2000`. Set `0` (or `animate: false`) to snap to the target.
-- The timer pauses while the window is hidden and refreshes immediately when it becomes visible again.
-- A debounced `MutationObserver` still reattaches the footer when the app re-renders the timeline.
-- Measured on a ~200-message session (Windows 11, OpenCode Desktop 2.2.3): `500` used about **1.6% of one CPU
-  core**; `16.67` (60 Hz) used about **12.7%** over the same 20-second window. The count-up animation is already
-  60 Hz via `requestAnimationFrame`, so a 60 Hz data poll buys no extra visual smoothness.
+`refreshMode` is the switch:
+
+- **`"continuous"` (default)** — the sampler reads the store every `sampleMs` (100 ms) while the session is running,
+  and every 1000 ms when idle. The display runs at 60 Hz and follows the latest target with a first-order lag
+  (`smoothMs`, 250 ms). A new sample only changes the target; it never restarts the animation, so the counter reads
+  as one continuous motion from the first token to the final total.
+- **`"interval"`** — the old behavior: read every `refreshMs` (500 ms), then tween to the new value over `tweenMs`
+  (550 ms). Use this if you prefer visible step changes or a fixed sampling cadence.
+
+`animate: false` disables both filters and snaps to the target.
+
+Why this split: the display can update at 60 Hz, but the data can only change when the session store changes. Polling
+the store at 60 Hz is wasteful (see the measurement below); sampling at 100 ms and filtering at 60 Hz gives the same
+visual continuity at a fraction of the CPU.
+
+Measured on a ~200-message session (Windows 11, OpenCode Desktop 2.2.3): `interval` at 500 ms used about **1.6% of
+one CPU core**; polling at 16.67 ms (60 Hz) used about **12.7%** over the same 20-second window; `continuous` with
+100 ms sampling used about **2.7%**. The count-up animation was already 60 Hz via `requestAnimationFrame`, so 60 Hz
+*data* polling bought no extra smoothness. Continuous mode keeps the 60 Hz animation but samples at 100 ms, so it
+gets the smooth motion without the 60 Hz polling cost.
+
+The timer pauses while the window is hidden and refreshes immediately when it becomes visible again. A debounced
+`MutationObserver` still reattaches the footer when the app re-renders the timeline.
 
 ### Display modes
 

@@ -56,7 +56,7 @@
 ## 功能
 
 - **按轮统计，不是按单条消息。** 一轮一个 footer，汇总所有 assistant 请求和工具循环。
-- **实时计数。** 数字像 CLI 一样连续滚动，不是每 500ms 跳一下；尊重 `prefers-reduced-motion`。
+- **实时计数。** 默认 `continuous` 模式：会话运行时每 100ms 采样，60Hz 一阶滞后持续追目标，新采样只改目标、不重置动画，所以从第一个 token 到最终合计是一段连续运动；`interval` 模式保留原来的离散刷新 + tween。尊重 `prefers-reduced-motion`。
 - **缓存感知。** 显示缓存读和缓存命中率——DeepSeek / Anthropic 的费用差异主要在这里。
 - **默认人民币。** 支持手动汇率或每日缓存汇率，原始美元放在 tooltip；`"currency": "USD"` 切回美元，`"auto"` 跟随界面语言。
 - **撤销感知。** 被 revert / undo 边界隐藏的消息不会计入。
@@ -64,7 +64,7 @@
 - **紧凑 / 详细。** 默认只显示决策相关的数；`detailed` 会把推理 token 和缓存写也放到可见行。
 - **零运行时依赖。** 一个构建好的 CJS 文件；默认不联网、没有遥测、不读 API Key（只有手动开启 `usdToCny: "auto"` 才会每天请求一次汇率）。
 - **安静失败。** OpenCode 更新导致内部 DOM 变化时，插件只打印一次警告，不会破坏时间线。
-- **快。** 2,000 条消息的聚合在测试里约 3ms；界面是 500ms 定时器 + 防抖 `MutationObserver`。
+- **快。** 2,000 条消息的聚合在测试里约 3ms；continuous 模式 100ms 采样 + 60Hz 滤波，interval 模式用 `refreshMs` 定时器，另有防抖 `MutationObserver`。
 
 ## 安装
 
@@ -126,6 +126,9 @@ opencode plugin remove opencode-token-usage-gui
         "detailed": false,
         "showCost": true,
         "animate": true,
+        "refreshMode": "continuous",
+        "sampleMs": 100,
+        "smoothMs": 250,
         "refreshMs": 500,
         "tweenMs": 550,
         "currency": "CNY",
@@ -141,9 +144,12 @@ opencode plugin remove opencode-token-usage-gui
 | `compact` | `false` | 只显示输入、输出、合计、费用。 |
 | `detailed` | `false` | 在可见行里额外显示推理 token 和缓存写。 |
 | `showCost` | `true` | 显示每轮费用。 |
-| `animate` | `true` | 数字滚动动画；设 `false` 或 `tweenMs: 0` 可关闭。 |
-| `refreshMs` | `500` | 刷新间隔，限制在 16–5000ms。`16.67` 对应 60Hz，CPU 很高，仅建议实验。 |
-| `tweenMs` | `550` | 数字滚动时长，限制在 0–2000ms；`0` 表示直接跳。 |
+| `animate` | `true` | 是否动画；`false` 两种模式都直接跳。 |
+| `refreshMode` | `"continuous"` | `"continuous"`（连续计数）或 `"interval"`（间隔刷新 + tween）。 |
+| `sampleMs` | `100` | continuous 模式运行中的采样间隔，50–1000ms；空闲时 1000ms。 |
+| `smoothMs` | `250` | continuous 模式的一阶滞后时间常数，50–2000ms；越大越柔和/越慢。 |
+| `refreshMs` | `500` | 仅 interval 模式：刷新间隔，16–5000ms。 |
+| `tweenMs` | `550` | 仅 interval 模式：tween 时长，0–2000ms。 |
 | `currency` | `"CNY"` | `"CNY"`、`"USD"` 或 `"auto"`；`auto` 在中文界面用人民币，其他语言用美元。 |
 | `usdToCny` | `6.68` | 数字表示手动汇率（不联网）；`"auto"` 表示每日自动汇率（见下）。 |
 
@@ -180,14 +186,27 @@ tooltip 会明确告诉你用的是哪种汇率：
 
 想让数字和账单完全一致，就把 `usdToCny` 改成你自己的计费汇率。
 
-### 刷新频率
+### 刷新模式
 
-- `refreshMs` 默认 `500`，限制在 `16–5000`。越小数字越新，但 CPU 越高；`16.67`（60Hz）会每帧读一次会话 store，仅建议实验。
-- `tweenMs` 默认 `550`，限制在 `0–2000`。设 `0`（或 `animate: false`）直接跳到目标值。
-- 窗口隐藏时定时器暂停，重新可见时立即刷新一次。
-- 应用重渲染时间线时，防抖的 `MutationObserver` 会把 footer 挂回去。
-- 在 Windows 11、约 200 条消息的会话上实测：`500` 约占单核 **1.6%**，`16.67`（60Hz）约占 **12.7%**（20 秒
-  `Get-Process` CPU 时间）。数字动画本来就是 `requestAnimationFrame` 的 60Hz，提高轮询频率不会让画面更顺。
+`refreshMode` 就是开关：
+
+- **`"continuous"`（默认）**：会话运行时每 `sampleMs`（100ms）读一次 store，空闲时每 1000ms 读一次；画面
+  60Hz 用一阶滞后（`smoothMs`，250ms）追最新目标。新采样只改变目标，不重置动画，所以从第一个 token 到
+  最终合计看起来是一段连续运动。
+- **`"interval"`**：原来的行为，每 `refreshMs`（500ms）读一次，再用 `tweenMs`（550ms）补间。适合喜欢明显
+  分段或固定采样节奏的人。
+
+`animate: false` 两种模式都直接跳到目标值。
+
+为什么这样拆：屏幕可以 60Hz 更新，但数据只会在会话 store 变化时变；60Hz 轮询 store 很浪费（见下）。
+100ms 采样 + 60Hz 滤波，用更低 CPU 得到同样的连续感。
+
+在 Windows 11、约 200 条消息的会话上实测：`interval` 500ms 约占单核 **1.6%**，continuous（100ms 采样）
+约占 **2.7%**，16.67ms（60Hz）轮询约占 **12.7%**（20 秒 `Get-Process` CPU 时间）。continuous 模式保持 60Hz
+动画但 100ms 采样，避免 60Hz 轮询成本。
+
+窗口隐藏时采样暂停，重新可见时立即刷新一次；应用重渲染时间线时，防抖的 `MutationObserver` 会把 footer
+挂回去。
 
 ### 显示模式
 
@@ -279,7 +298,7 @@ OpenCode 如果改了 slot 名，footer 会消失（插件只打印一次警告�
 默认用手动 `usdToCny`（`6.68`）。设成 `"usdToCny": "auto"` 会每天拉一次汇率、缓存 24 小时；失败时用上次缓存或 `6.68` 兜底。tooltip 会显示汇率、来源和自动更新的日期。
 
 **刷新频率能调吗？**
-可以：`refreshMs`（200–5000，默认 500）和 `tweenMs`（0–2000，默认 550）。窗口隐藏时定时器会暂停，重新可见时立即刷新。
+可以。`refreshMode: "continuous"` 用 `sampleMs`（50–1000，默认 100）和 `smoothMs`（50–2000，默认 250）；`refreshMode: "interval"` 用 `refreshMs`（16–5000，默认 500）和 `tweenMs`（0–2000，默认 550）。窗口隐藏时暂停采样，重新可见时立即刷新。
 
 **TUI 能用吗？**
 不能。TUI 用 `debug.turn_tokens`；这个插件是给桌面 GUI 的。

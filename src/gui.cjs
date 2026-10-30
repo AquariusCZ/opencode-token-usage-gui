@@ -3,6 +3,7 @@
 const { Plugin, Style } = require("@opencode/plugin/gui")
 const {
   METRICS,
+  approachValue,
   buildTurns,
   cacheHitRate,
   clampNumber,
@@ -12,6 +13,7 @@ const {
   formatMoney,
   normalizeCurrency,
   sameTotals,
+  smoothingAlpha,
 } = require("./core.cjs")
 
 const FOOTER_ATTR = "data-token-usage"
@@ -22,6 +24,13 @@ const MIN_REFRESH_MS = 16
 const MAX_REFRESH_MS = 5000
 const DEFAULT_TWEEN_MS = 550
 const MAX_TWEEN_MS = 2000
+const DEFAULT_SAMPLE_MS = 100
+const MIN_SAMPLE_MS = 50
+const MAX_SAMPLE_MS = 1000
+const DEFAULT_SMOOTH_MS = 250
+const MIN_SMOOTH_MS = 50
+const MAX_SMOOTH_MS = 2000
+const IDLE_SAMPLE_MS = 1000
 const MUTATION_DELAY_MS = 120
 const DEFAULT_USD_TO_CNY = 6.68
 const FX_CACHE_KEY = "opencode-token-usage-gui:fx"
@@ -331,6 +340,15 @@ function applyTurn(entry, turn, view, animate) {
     return
   }
 
+  if (view.continuous) {
+    // Continuous mode keeps the current value and only moves the target.
+    // The 60 Hz filter in tick() eases toward it; a new sample never resets
+    // the animation, so the counter reads as one continuous motion.
+    entry.target = next
+    view.ensureAnimation()
+    return
+  }
+
   entry.from = { ...entry.current }
   entry.target = next
   entry.startedAt = performance.now()
@@ -354,9 +372,13 @@ module.exports = Plugin.define({
     const compact = options.compact === true
     const detailed = options.detailed === true
     const showCost = options.showCost !== false
+    const refreshMode = options.refreshMode === "interval" ? "interval" : "continuous"
+    const continuous = refreshMode === "continuous"
     const refreshMs = clampNumber(options.refreshMs, MIN_REFRESH_MS, MAX_REFRESH_MS, DEFAULT_REFRESH_MS)
     const tweenMs = clampNumber(options.tweenMs, 0, MAX_TWEEN_MS, DEFAULT_TWEEN_MS)
-    const animate = options.animate !== false && tweenMs > 0 && !reducedMotion()
+    const sampleMs = clampNumber(options.sampleMs, MIN_SAMPLE_MS, MAX_SAMPLE_MS, DEFAULT_SAMPLE_MS)
+    const smoothMs = clampNumber(options.smoothMs, MIN_SMOOTH_MS, MAX_SMOOTH_MS, DEFAULT_SMOOTH_MS)
+    const animate = options.animate !== false && !reducedMotion() && (continuous || tweenMs > 0)
     const currency = normalizeCurrency(options.currency, locale)
     const autoRate = String(options.usdToCny).toLowerCase() === "auto"
     const manualRate = finite(options.usdToCny) > 0 ? finite(options.usdToCny) : DEFAULT_USD_TO_CNY
@@ -374,6 +396,7 @@ module.exports = Plugin.define({
       compact,
       detailed,
       showCost,
+      continuous,
       currency,
       money: (usd) =>
         formatMoney(
@@ -398,7 +421,10 @@ module.exports = Plugin.define({
           ? "—"
           : pctFmt.format(Number(value) / 100),
       ensureAnimation: () => {
-        if (animate && frame === undefined) frame = requestAnimationFrame(tick)
+        if (animate && frame === undefined) {
+          lastFrame = 0
+          frame = requestAnimationFrame(tick)
+        }
       },
     }
 
@@ -414,8 +440,9 @@ module.exports = Plugin.define({
     }
 
     const state = new Map()
-    let timer
+    let sampleTimer
     let frame
+    let lastFrame = 0
     let mutationTimer
     let observedScroll = null
     let warned = false
@@ -446,6 +473,32 @@ module.exports = Plugin.define({
     }
 
     const tick = (now) => {
+      if (continuous) {
+        const dt = lastFrame ? Math.max(0, now - lastFrame) : 16.67
+        lastFrame = now
+        const alpha = smoothingAlpha(dt, smoothMs)
+        let active = false
+
+        for (const entry of state.values()) {
+          let done = true
+          for (const key of METRICS) {
+            const target = entry.target[key]
+            if (Math.abs(target - entry.current[key]) < 0.5) {
+              entry.current[key] = target
+            } else {
+              entry.current[key] = approachValue(entry.current[key], target, alpha)
+              done = false
+            }
+          }
+          paint(entry, view)
+          if (!done) active = true
+        }
+
+        frame = active ? requestAnimationFrame(tick) : undefined
+        if (!active) lastFrame = 0
+        return
+      }
+
       let active = false
       for (const entry of state.values()) {
         if (!entry.startedAt) continue
@@ -557,6 +610,30 @@ module.exports = Plugin.define({
       }
     }
 
+    const sampleInterval = () => {
+      if (!continuous) return refreshMs
+      const session = ctx.sessions.current()
+      const data = session && session.server && session.server.data
+      const status = data && data.session && data.session.status
+      if (typeof status !== "function" || !session.id) return sampleMs
+      try {
+        return status.call(data.session, session.id) === "running"
+          ? sampleMs
+          : Math.max(sampleMs, IDLE_SAMPLE_MS)
+      } catch {
+        return sampleMs
+      }
+    }
+
+    const scheduleSample = () => {
+      if (disposed) return
+      sampleTimer = setTimeout(() => {
+        if (disposed) return
+        refresh()
+        scheduleSample()
+      }, sampleInterval())
+    }
+
     const refreshDetails = () => {
       if (disposed) return
       for (const entry of state.values()) {
@@ -623,7 +700,7 @@ module.exports = Plugin.define({
 
     const cleanup = () => {
       disposed = true
-      clearInterval(timer)
+      clearTimeout(sampleTimer)
       if (mutationTimer) clearTimeout(mutationTimer)
       if (frame !== undefined) cancelAnimationFrame(frame)
       if (observer) observer.disconnect()
@@ -644,7 +721,7 @@ module.exports = Plugin.define({
 
     document.addEventListener("visibilitychange", onVisibilityChange)
     refresh()
-    timer = setInterval(refresh, refreshMs)
+    scheduleSample()
     void loadRate()
 
     return cleanup

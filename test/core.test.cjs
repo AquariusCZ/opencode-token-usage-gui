@@ -4,6 +4,7 @@ const test = require("node:test")
 const assert = require("node:assert/strict")
 
 const {
+  approachValue,
   buildTurns,
   cacheHitRate,
   clampNumber,
@@ -14,6 +15,7 @@ const {
   formatPercent,
   normalizeCurrency,
   sameTotals,
+  smoothingAlpha,
   tokenUsage,
   visibleMessages,
 } = require("../src/core.cjs")
@@ -193,6 +195,21 @@ test("normalizeCurrency resolves explicit and automatic modes", () => {
   assert.equal(normalizeCurrency("auto", "zh-CN"), "CNY")
   assert.equal(normalizeCurrency("auto", "en-US"), "USD")
   assert.equal(normalizeCurrency(undefined, "en-US"), "CNY")
+})
+
+test("smoothingAlpha is frame-rate independent and bounded", () => {
+  assert.equal(smoothingAlpha(0, 250), 0)
+  assert.equal(smoothingAlpha(-10, 250), 0)
+  assert.ok(Math.abs(smoothingAlpha(250, 250) - (1 - Math.exp(-1))) < 1e-9)
+  assert.ok(smoothingAlpha(1000, 250) > 0.98)
+  assert.equal(smoothingAlpha(1000, 250), Math.min(1, 1 - Math.exp(-4)))
+})
+
+test("approachValue never overshoots and clamps alpha", () => {
+  assert.equal(approachValue(0, 100, 0.5), 50)
+  assert.equal(approachValue(100, 100, 0.5), 100)
+  assert.equal(approachValue(0, 100, 2), 100)
+  assert.equal(approachValue(0, 100, -1), 0)
 })
 
 test("formatters are stable and readable", () => {
