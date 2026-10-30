@@ -117,6 +117,10 @@ const CSS = `
   cursor: pointer;
   transition: opacity 120ms ease, color 120ms ease, background-color 120ms ease;
 }
+[${FOOTER_ATTR}]:hover .tu-info,
+[${FOOTER_ATTR}][data-open="true"] .tu-info {
+  opacity: 0.8;
+}
 [${FOOTER_ATTR}] .tu-info:hover {
   opacity: 1;
   color: var(--v2-text-text-base, #d4d4d4);
@@ -772,7 +776,9 @@ function bindTooltip(entry, view) {
   const onClick = (event) => {
     event.preventDefault()
     event.stopPropagation()
-    setPinned(!pinned)
+    const next = !pinned
+    setPinned(next)
+    if (!next) hide(0)
   }
 
   const onFocus = () => show()

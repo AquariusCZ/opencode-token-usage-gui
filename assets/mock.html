@@ -597,6 +597,10 @@
         cursor: pointer;
         transition: opacity 120ms ease, color 120ms ease, background-color 120ms ease;
       }
+      [data-token-usage]:hover .tu-info,
+      [data-token-usage][data-open="true"] .tu-info {
+        opacity: 0.8;
+      }
       [data-token-usage] .tu-info:hover {
         opacity: 1;
         color: var(--v2-text-text-base);
@@ -1019,7 +1023,7 @@
           root.toggleAttribute("data-pinned", pinned)
           button.setAttribute("aria-label", pinned ? "Hide token breakdown" : "Show token breakdown")
           if (pinned) show()
-          else if (!root.matches(":hover") && !button.matches(":focus-visible")) hide()
+          else hide()
         })
         root.addEventListener("keydown", (event) => {
           if (event.key !== "Escape") return
