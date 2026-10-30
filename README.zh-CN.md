@@ -15,7 +15,9 @@
 
 </div>
 
-![OpenCode Desktop 的每轮 token footer](assets/screenshot.png)
+![OpenCode Desktop 的每轮 token footer](assets/screenshot-en.png)
+
+*英文示意图，非真实会话截图。*
 
 > OpenCode Desktop 右上角显示的是「最近一次请求」和「整个会话累计」。
 > 它不回答「这一轮花了多少」。这个插件补的就是这一行。
@@ -56,11 +58,11 @@
 - **按轮统计，不是按单条消息。** 一轮一个 footer，汇总所有 assistant 请求和工具循环。
 - **实时计数。** 数字像 CLI 一样连续滚动，不是每 500ms 跳一下；尊重 `prefers-reduced-motion`。
 - **缓存感知。** 显示缓存读和缓存命中率——DeepSeek / Anthropic 的费用差异主要在这里。
-- **默认人民币。** 把应用上报的美元费用按可配置汇率换成 ¥，原始美元放在 tooltip；`"currency": "USD"` 可切回美元。
+- **默认人民币。** 支持手动汇率或每日缓存汇率，原始美元放在 tooltip；`"currency": "USD"` 切回美元，`"auto"` 跟随界面语言。
 - **撤销感知。** 被 revert / undo 边界隐藏的消息不会计入。
 - **中英双语。** 跟随应用语言自动切换。
 - **紧凑 / 详细。** 默认只显示决策相关的数；`detailed` 会把推理 token 和缓存写也放到可见行。
-- **零运行时依赖。** 一个构建好的 CJS 文件；不联网、没有遥测、不读 API Key。
+- **零运行时依赖。** 一个构建好的 CJS 文件；默认不联网、没有遥测、不读 API Key（只有手动开启 `usdToCny: "auto"` 才会每天请求一次汇率）。
 - **安静失败。** OpenCode 更新导致内部 DOM 变化时，插件只打印一次警告，不会破坏时间线。
 - **快。** 2,000 条消息的聚合在测试里约 3ms；界面是 500ms 定时器 + 防抖 `MutationObserver`。
 
@@ -124,6 +126,8 @@ opencode plugin remove opencode-token-usage-gui
         "detailed": false,
         "showCost": true,
         "animate": true,
+        "refreshMs": 500,
+        "tweenMs": 550,
         "currency": "CNY",
         "usdToCny": 6.68
       }
@@ -137,9 +141,11 @@ opencode plugin remove opencode-token-usage-gui
 | `compact` | `false` | 只显示输入、输出、合计、费用。 |
 | `detailed` | `false` | 在可见行里额外显示推理 token 和缓存写。 |
 | `showCost` | `true` | 显示每轮费用。 |
-| `animate` | `true` | 数字滚动动画。 |
-| `currency` | `"CNY"` | `"CNY"` 或 `"USD"`。 |
-| `usdToCny` | `6.68` | 人民币换算汇率。默认值是 2026-10-30 的参考汇率，建议改成你自己的计费汇率。 |
+| `animate` | `true` | 数字滚动动画；设 `false` 或 `tweenMs: 0` 可关闭。 |
+| `refreshMs` | `500` | 刷新间隔，限制在 200–5000ms。越小越新，但 CPU 越高。 |
+| `tweenMs` | `550` | 数字滚动时长，限制在 0–2000ms；`0` 表示直接跳。 |
+| `currency` | `"CNY"` | `"CNY"`、`"USD"` 或 `"auto"`；`auto` 在中文界面用人民币，其他语言用美元。 |
+| `usdToCny` | `6.68` | 数字表示手动汇率（不联网）；`"auto"` 表示每日自动汇率（见下）。 |
 
 本地目录也可以用同样的方式配置：
 
@@ -153,6 +159,33 @@ opencode plugin remove opencode-token-usage-gui
   ]
 }
 ```
+
+### 货币与汇率
+
+应用上报的 `message.cost` 永远是美元；人民币只是**显示换算**，不是第二套计费。
+
+- `currency: "CNY"`（默认）显示 `¥`。
+- `currency: "USD"` 显示应用原始的 `$`。
+- `currency: "auto"`：中文界面用人民币，其他语言用美元。
+- `usdToCny: 6.68` 是手动汇率，**不联网**，结果确定。
+- `usdToCny: "auto"` 每天从 `open.er-api.com` 拉一次 USD→CNY，缓存 24 小时；失败时用上次缓存或 `6.68` 兜底。只有这个显式选项会联网。
+
+tooltip 会明确告诉你用的是哪种汇率：
+
+```text
+汇率 6.68 · 手动
+汇率 6.72 · 自动 (2026-10-30)
+汇率 6.68 · 兜底
+```
+
+想让数字和账单完全一致，就把 `usdToCny` 改成你自己的计费汇率。
+
+### 刷新频率
+
+- `refreshMs` 默认 `500`，限制在 `200–5000`。越小数字越新，但 CPU 越高。
+- `tweenMs` 默认 `550`，限制在 `0–2000`。设 `0`（或 `animate: false`）直接跳到目标值。
+- 窗口隐藏时定时器暂停，重新可见时立即刷新一次。
+- 应用重渲染时间线时，防抖的 `MutationObserver` 会把 footer 挂回去。
 
 ### 显示模式
 
@@ -215,9 +248,10 @@ OpenCode 如果改了 slot 名，footer 会消失（插件只打印一次警告�
 
 ## 隐私
 
-- 不联网、没有遥测、不读取 API Key。
+- 默认不联网、没有遥测、不读取 API Key。
 - 只读桌面端内存里已经存在的本地会话状态。
-- 默认汇率是常量，不会在运行时请求汇率接口。
+- 默认汇率是手动常量，不会在运行时请求汇率接口。
+- `usdToCny: "auto"` 是唯一的联网路径：每天一次 `open.er-api.com`，缓存 24 小时。想完全离线就保持手动汇率。
 
 ## 常见问题
 
@@ -238,6 +272,12 @@ OpenCode 如果改了 slot 名，footer 会消失（插件只打印一次警告�
 
 **OpenCode 升级后还能用吗？**
 通常可以；最脆的是选择器。升级后 footer 消失的话，带上 OpenCode 版本和截图开 issue。
+
+**汇率是怎么定的？**
+默认用手动 `usdToCny`（`6.68`）。设成 `"usdToCny": "auto"` 会每天拉一次汇率、缓存 24 小时；失败时用上次缓存或 `6.68` 兜底。tooltip 会显示汇率、来源和自动更新的日期。
+
+**刷新频率能调吗？**
+可以：`refreshMs`（200–5000，默认 500）和 `tweenMs`（0–2000，默认 550）。窗口隐藏时定时器会暂停，重新可见时立即刷新。
 
 **TUI 能用吗？**
 不能。TUI 用 `debug.turn_tokens`；这个插件是给桌面 GUI 的。

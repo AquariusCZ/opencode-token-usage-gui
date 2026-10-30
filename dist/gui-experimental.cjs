@@ -1,4 +1,4 @@
-/*! opencode-token-usage-gui v0.1.0 | MIT | https://github.com/AquariusCZ/opencode-token-usage-gui */
+/*! opencode-token-usage-gui v0.2.0 | MIT | https://github.com/AquariusCZ/opencode-token-usage-gui */
 "use strict";
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
@@ -24,6 +24,19 @@ var require_core = __commonJS({
     function finite2(value) {
       const number = Number(value);
       return Number.isFinite(number) ? number : 0;
+    }
+    function clampNumber2(value, min, max, fallback) {
+      const number = Number(value);
+      if (!Number.isFinite(number)) return fallback;
+      return Math.min(max, Math.max(min, number));
+    }
+    function normalizeCurrency2(value, locale) {
+      const code = String(value || "CNY").toUpperCase();
+      if (code === "USD") return "USD";
+      if (code === "AUTO") {
+        return String(locale || "").toLowerCase().startsWith("zh") ? "CNY" : "USD";
+      }
+      return "CNY";
     }
     function emptyTotals() {
       return {
@@ -174,6 +187,7 @@ var require_core = __commonJS({
       addUsage,
       buildTurns: buildTurns2,
       cacheHitRate: cacheHitRate2,
+      clampNumber: clampNumber2,
       emptyTotals,
       finite: finite2,
       formatCost: formatCost2,
@@ -181,6 +195,7 @@ var require_core = __commonJS({
       formatInt,
       formatMoney: formatMoney2,
       formatPercent,
+      normalizeCurrency: normalizeCurrency2,
       sameTotals: sameTotals2,
       tokenUsage,
       visibleMessages
@@ -194,18 +209,28 @@ var {
   METRICS,
   buildTurns,
   cacheHitRate,
+  clampNumber,
   finite,
   formatCost,
   formatDuration,
   formatMoney,
+  normalizeCurrency,
   sameTotals
 } = require_core();
 var FOOTER_ATTR = "data-token-usage";
 var STYLE_ID = "opencode-token-usage-gui-style";
 var GUARD_KEY = "__OPENCODE_TOKEN_USAGE_GUI__";
-var REFRESH_MS = 500;
+var DEFAULT_REFRESH_MS = 500;
+var MIN_REFRESH_MS = 200;
+var MAX_REFRESH_MS = 5e3;
+var DEFAULT_TWEEN_MS = 550;
+var MAX_TWEEN_MS = 2e3;
 var MUTATION_DELAY_MS = 120;
-var TWEEN_MS = 550;
+var DEFAULT_USD_TO_CNY = 6.68;
+var FX_CACHE_KEY = "opencode-token-usage-gui:fx";
+var FX_URL = "https://open.er-api.com/v6/latest/USD";
+var FX_TTL_MS = 24 * 60 * 60 * 1e3;
+var FX_TIMEOUT_MS = 8e3;
 var COPY = {
   en: {
     turn: "This turn",
@@ -217,7 +242,11 @@ var COPY = {
     cacheHit: "Cache hit",
     total: "Total",
     tokens: "tokens",
-    requests: "model requests"
+    requests: "model requests",
+    rate: "Exchange rate",
+    rateManual: "manual",
+    rateAuto: "auto",
+    rateFallback: "fallback"
   },
   zh: {
     turn: "\u672C\u8F6E",
@@ -229,7 +258,11 @@ var COPY = {
     cacheHit: "\u7F13\u5B58\u547D\u4E2D",
     total: "\u5408\u8BA1",
     tokens: "\u8BCD\u5143",
-    requests: "\u6B21\u6A21\u578B\u8BF7\u6C42"
+    requests: "\u6B21\u6A21\u578B\u8BF7\u6C42",
+    rate: "\u6C47\u7387",
+    rateManual: "\u624B\u52A8",
+    rateAuto: "\u81EA\u52A8",
+    rateFallback: "\u515C\u5E95"
   }
 };
 var CSS = `
@@ -293,6 +326,27 @@ function pickLocale(ctx) {
   }
   if (typeof navigator !== "undefined" && navigator.language) return navigator.language.toLowerCase();
   return "en";
+}
+function readFxCache() {
+  try {
+    if (typeof localStorage === "undefined") return null;
+    const raw = localStorage.getItem(FX_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const rate = Number(parsed && parsed.rate);
+    if (!Number.isFinite(rate) || rate <= 0) return null;
+    return { rate, at: Number(parsed && parsed.at) || 0 };
+  } catch {
+    return null;
+  }
+}
+function writeFxCache(value) {
+  try {
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem(FX_CACHE_KEY, JSON.stringify(value));
+    }
+  } catch {
+  }
 }
 function reducedMotion() {
   try {
@@ -417,6 +471,8 @@ function updateDetail(entry, turn, view) {
     `${copy.cacheRead} ${view.int(turn.totals.cacheRead)} \xB7 ${copy.cacheWrite} ${view.int(turn.totals.cacheWrite)} \xB7 ${copy.cacheHit} ${view.percent(turn.cacheHitRate)}`,
     `${view.int(turn.requests)} ${copy.requests}${turn.durationMs > 0 ? ` \xB7 ${formatDuration(turn.durationMs)}` : ""}`
   ];
+  const rateLine = view.rateLine();
+  if (rateLine) lines.push(rateLine);
   entry.root.title = lines.join("\n");
   if (entry.costEl) {
     setText(entry.costEl, shown);
@@ -458,9 +514,13 @@ module.exports = Plugin.define({
     const compact = options.compact === true;
     const detailed = options.detailed === true;
     const showCost = options.showCost !== false;
-    const animate = options.animate !== false && !reducedMotion();
-    const currency = String(options.currency || "CNY").toUpperCase() === "USD" ? "USD" : "CNY";
-    const usdToCny = finite(options.usdToCny) > 0 ? finite(options.usdToCny) : 6.68;
+    const refreshMs = clampNumber(options.refreshMs, MIN_REFRESH_MS, MAX_REFRESH_MS, DEFAULT_REFRESH_MS);
+    const tweenMs = clampNumber(options.tweenMs, 0, MAX_TWEEN_MS, DEFAULT_TWEEN_MS);
+    const animate = options.animate !== false && tweenMs > 0 && !reducedMotion();
+    const currency = normalizeCurrency(options.currency, locale);
+    const autoRate = String(options.usdToCny).toLowerCase() === "auto";
+    const manualRate = finite(options.usdToCny) > 0 ? finite(options.usdToCny) : DEFAULT_USD_TO_CNY;
+    const rate = { value: manualRate, at: 0, source: "manual" };
     const intFmt = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 });
     const pctFmt = new Intl.NumberFormat(locale, {
       style: "percent",
@@ -475,10 +535,21 @@ module.exports = Plugin.define({
       showCost,
       currency,
       money: (usd) => formatMoney(
-        finite(usd) * (currency === "CNY" ? usdToCny : 1),
+        finite(usd) * (currency === "CNY" ? rate.value : 1),
         currency,
         locale
       ),
+      rateLine: () => {
+        if (currency !== "CNY" || !(rate.value > 0)) return "";
+        let source = copy.rateManual;
+        if (rate.source === "auto") {
+          source = copy.rateAuto;
+          if (rate.at > 0) source += ` (${new Date(rate.at).toISOString().slice(0, 10)})`;
+        } else if (rate.source === "fallback") {
+          source = copy.rateFallback;
+        }
+        return `${copy.rate} ${rate.value.toFixed(2)} \xB7 ${source}`;
+      },
       int: (value) => intFmt.format(Math.round(finite(value))),
       percent: (value) => value === null || value === void 0 || !Number.isFinite(Number(value)) ? "\u2014" : pctFmt.format(Number(value) / 100),
       ensureAnimation: () => {
@@ -501,6 +572,7 @@ module.exports = Plugin.define({
     let mutationTimer;
     let observedScroll = null;
     let warned = false;
+    let disposed = false;
     const warn = (error) => {
       if (warned) return;
       warned = true;
@@ -523,7 +595,7 @@ module.exports = Plugin.define({
       let active = false;
       for (const entry of state.values()) {
         if (!entry.startedAt) continue;
-        const progress = Math.min(1, (now - entry.startedAt) / TWEEN_MS);
+        const progress = Math.min(1, (now - entry.startedAt) / tweenMs);
         const eased = 1 - Math.pow(1 - progress, 3);
         for (const key of METRICS) {
           entry.current[key] = entry.from[key] + (entry.target[key] - entry.from[key]) * eased;
@@ -606,17 +678,77 @@ module.exports = Plugin.define({
       }
     };
     const refresh = () => {
+      if (disposed || document.hidden) return;
       try {
         sync();
       } catch (error) {
         warn(error);
       }
     };
+    const refreshDetails = () => {
+      if (disposed) return;
+      for (const entry of state.values()) {
+        if (entry.turn) updateDetail(entry, entry.turn, view);
+      }
+    };
+    const loadRate = async () => {
+      if (!autoRate || currency !== "CNY" || disposed) return;
+      const cached = readFxCache();
+      if (cached) {
+        rate.value = cached.rate;
+        rate.at = cached.at;
+        rate.source = "auto";
+        refreshDetails();
+        if (cached.at > 0 && Date.now() - cached.at < FX_TTL_MS) return;
+      }
+      try {
+        if (typeof fetch !== "function") throw new Error("fetch is not available");
+        const controller = typeof AbortController === "function" ? new AbortController() : void 0;
+        const timeout = controller ? setTimeout(() => controller.abort(), FX_TIMEOUT_MS) : void 0;
+        let response;
+        try {
+          response = await fetch(FX_URL, {
+            headers: { accept: "application/json" },
+            signal: controller && controller.signal
+          });
+        } finally {
+          if (timeout) clearTimeout(timeout);
+        }
+        if (disposed) return;
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const json = await response.json();
+        const value = Number(json && json.rates && json.rates.CNY);
+        if (!Number.isFinite(value) || value <= 0) throw new Error("invalid CNY rate");
+        rate.value = value;
+        rate.at = Date.now();
+        rate.source = "auto";
+        writeFxCache({ rate: value, at: rate.at });
+        refreshDetails();
+      } catch (error) {
+        if (disposed) return;
+        if (!cached) {
+          rate.value = manualRate;
+          rate.at = 0;
+          rate.source = "fallback";
+          refreshDetails();
+        }
+        console.warn(
+          "[token-usage-gui] exchange-rate fetch failed; using",
+          rate.value,
+          error && error.message ? error.message : error
+        );
+      }
+    };
+    const onVisibilityChange = () => {
+      if (!document.hidden) refresh();
+    };
     const cleanup = () => {
+      disposed = true;
       clearInterval(timer);
       if (mutationTimer) clearTimeout(mutationTimer);
       if (frame !== void 0) cancelAnimationFrame(frame);
       if (observer) observer.disconnect();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       for (const entry of state.values()) entry.root.remove();
       state.clear();
       if (styleNode) styleNode.remove();
@@ -630,8 +762,10 @@ module.exports = Plugin.define({
       }
     }
     window[GUARD_KEY] = { cleanup };
+    document.addEventListener("visibilitychange", onVisibilityChange);
     refresh();
-    timer = setInterval(refresh, REFRESH_MS);
+    timer = setInterval(refresh, refreshMs);
+    void loadRate();
     return cleanup;
   }
 });

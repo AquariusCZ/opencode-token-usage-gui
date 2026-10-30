@@ -26,6 +26,25 @@ function finite(value) {
   return Number.isFinite(number) ? number : 0
 }
 
+function clampNumber(value, min, max, fallback) {
+  const number = Number(value)
+  if (!Number.isFinite(number)) return fallback
+  return Math.min(max, Math.max(min, number))
+}
+
+/**
+ * Resolve the display currency. "auto" follows the UI language: Chinese gets
+ * CNY, everything else gets USD (the app's native billing currency).
+ */
+function normalizeCurrency(value, locale) {
+  const code = String(value || "CNY").toUpperCase()
+  if (code === "USD") return "USD"
+  if (code === "AUTO") {
+    return String(locale || "").toLowerCase().startsWith("zh") ? "CNY" : "USD"
+  }
+  return "CNY"
+}
+
 function emptyTotals() {
   return {
     input: 0,
@@ -214,6 +233,7 @@ module.exports = {
   addUsage,
   buildTurns,
   cacheHitRate,
+  clampNumber,
   emptyTotals,
   finite,
   formatCost,
@@ -221,6 +241,7 @@ module.exports = {
   formatInt,
   formatMoney,
   formatPercent,
+  normalizeCurrency,
   sameTotals,
   tokenUsage,
   visibleMessages,

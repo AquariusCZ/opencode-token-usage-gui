@@ -6,11 +6,13 @@ const assert = require("node:assert/strict")
 const {
   buildTurns,
   cacheHitRate,
+  clampNumber,
   formatCost,
   formatDuration,
   formatInt,
   formatMoney,
   formatPercent,
+  normalizeCurrency,
   sameTotals,
   tokenUsage,
   visibleMessages,
@@ -176,6 +178,21 @@ test("cacheHitRate uses prompt tokens only", () => {
 test("sameTotals compares rounded values", () => {
   assert.equal(sameTotals({ total: 1.2, input: 0 }, { total: 1.4, input: 0 }), true)
   assert.equal(sameTotals({ total: 1.2, input: 0 }, { total: 2.4, input: 0 }), false)
+})
+
+test("clampNumber keeps options inside safe bounds", () => {
+  assert.equal(clampNumber(50, 200, 5000, 500), 200)
+  assert.equal(clampNumber(9000, 200, 5000, 500), 5000)
+  assert.equal(clampNumber("nope", 200, 5000, 500), 500)
+  assert.equal(clampNumber(0, 0, 2000, 550), 0)
+})
+
+test("normalizeCurrency resolves explicit and automatic modes", () => {
+  assert.equal(normalizeCurrency("CNY", "en-US"), "CNY")
+  assert.equal(normalizeCurrency("usd", "zh-CN"), "USD")
+  assert.equal(normalizeCurrency("auto", "zh-CN"), "CNY")
+  assert.equal(normalizeCurrency("auto", "en-US"), "USD")
+  assert.equal(normalizeCurrency(undefined, "en-US"), "CNY")
 })
 
 test("formatters are stable and readable", () => {

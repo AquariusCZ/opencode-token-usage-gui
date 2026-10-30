@@ -15,7 +15,9 @@ A zero-config GUI plugin for **OpenCode Desktop**: per-turn tokens, cache hit ra
 
 </div>
 
-![OpenCode Desktop with a per-turn token footer](assets/screenshot.png)
+![OpenCode Desktop with a per-turn token footer](assets/screenshot-en.png)
+
+*Illustrative English mock of the footer and tooltip. Not a real session screenshot.*
 
 > OpenCode Desktop shows the latest request and the session total. It does not show what **this turn** cost.
 > This plugin adds the missing line.
@@ -60,13 +62,14 @@ numbers that actually change the bill.
   `prefers-reduced-motion`.
 - **Cache-aware.** Shows cache reads and the cache hit rate — the metric that explains most of the cost difference
   on DeepSeek and Anthropic models.
-- **RMB by default.** Converts the app's USD cost with a configurable rate; the original USD amount stays in the
-  tooltip. Set `"currency": "USD"` to switch back.
+- **RMB by default.** Converts the app's USD cost with a manual or daily-cached rate; the original USD amount stays
+  in the tooltip. `"currency": "USD"` switches back, `"auto"` follows the UI language.
 - **Revert-aware.** Messages hidden by an undo/revert boundary are excluded from totals.
 - **Bilingual.** Follows the app locale: 中文 or English.
 - **Compact or detailed.** Default shows the decision-making numbers; `detailed` adds reasoning tokens and cache
   writes to the visible line.
-- **Zero runtime dependencies.** One built CJS file. No network calls, no telemetry, no API keys.
+- **Zero runtime dependencies.** One built CJS file. No telemetry, no API keys, and no network requests unless you
+  explicitly opt into `usdToCny: "auto"`.
 - **Safe failure.** If the app's internal DOM changes, the plugin logs one warning and stays quiet instead of
   breaking the timeline.
 - **Fast.** Aggregating 2,000 messages takes about 3 ms in the test suite; the UI refresh is a 500 ms timer plus a
@@ -133,6 +136,8 @@ Options go in the plugin entry of `opencode.json(c)`:
         "detailed": false,
         "showCost": true,
         "animate": true,
+        "refreshMs": 500,
+        "tweenMs": 550,
         "currency": "CNY",
         "usdToCny": 6.68
       }
@@ -146,9 +151,11 @@ Options go in the plugin entry of `opencode.json(c)`:
 | `compact` | `false` | Show only input, output, total and cost. |
 | `detailed` | `false` | Also show reasoning tokens and cache writes on the visible line. |
 | `showCost` | `true` | Show the per-turn cost. |
-| `animate` | `true` | Tween the numbers instead of jumping every 500 ms. |
-| `currency` | `"CNY"` | `"CNY"` or `"USD"`. |
-| `usdToCny` | `6.68` | Conversion rate used for CNY. The default is the 2026-10-30 reference rate; set it to your billing rate. |
+| `animate` | `true` | Tween the numbers instead of jumping. Set `false` or `tweenMs: 0` to snap. |
+| `refreshMs` | `500` | Refresh interval, clamped to 200–5000 ms. Lower is fresher but uses more CPU. |
+| `tweenMs` | `550` | Count-up duration, clamped to 0–2000 ms. `0` disables the animation. |
+| `currency` | `"CNY"` | `"CNY"`, `"USD"`, or `"auto"`. `auto` uses CNY for a Chinese UI and USD otherwise. |
+| `usdToCny` | `6.68` | A number (manual rate, no network) or `"auto"` (daily cached rate; see below). |
 
 A local directory works the same way:
 
@@ -162,6 +169,33 @@ A local directory works the same way:
   ]
 }
 ```
+
+### Currency and exchange rate
+
+`message.cost` is always USD from the provider. The footer is a **display conversion**, not a second billing source.
+
+- `currency: "CNY"` (default) shows `¥`.
+- `currency: "USD"` shows the native `$` amount.
+- `currency: "auto"` uses CNY in a Chinese UI and USD otherwise.
+- `usdToCny: 6.68` is a manual rate. It is deterministic and makes **no network request**.
+- `usdToCny: "auto"` fetches the daily USD→CNY rate from `open.er-api.com`, caches it for 24 hours, and falls back to the last cached rate or the manual `6.68` when offline. Only this opt-in mode uses the network.
+
+The tooltip always tells you which rate was used:
+
+```text
+Exchange rate 6.68 · manual
+Exchange rate 6.72 · auto (2026-10-30)
+Exchange rate 6.68 · fallback
+```
+
+Set `usdToCny` to your actual billing rate if you want the number to match your invoice exactly.
+
+### Refresh rate
+
+- `refreshMs` defaults to `500` and is clamped to `200–5000`. Lower means fresher numbers; higher means less CPU.
+- `tweenMs` defaults to `550` and is clamped to `0–2000`. Set `0` (or `animate: false`) to snap to the target.
+- The timer pauses while the window is hidden and refreshes immediately when it becomes visible again.
+- A debounced `MutationObserver` still reattaches the footer when the app re-renders the timeline.
 
 ### Display modes
 
@@ -230,9 +264,11 @@ For the TUI, use the CLI's built-in `debug.turn_tokens` or one of the terminal-o
 
 ## Privacy
 
-- No network requests, no telemetry, no API keys.
+- No network requests by default, no telemetry, no API keys.
 - Reads only the local session state that the desktop app already has in memory.
-- The default exchange rate is a constant; it is not fetched at runtime.
+- The default exchange rate is a manual constant; it is not fetched at runtime.
+- `usdToCny: "auto"` is the only network path: one request per day to `open.er-api.com`, cached for 24 hours. Leave it
+  on the default manual value for a fully offline plugin.
 
 ## FAQ
 
@@ -255,6 +291,15 @@ The provider did not report a cost for that request. Free models and some local 
 **Will it survive an OpenCode update?**
 Usually yes; the selector is the fragile part. If the footer disappears after an update, open an issue with your
 OpenCode version and a screenshot.
+
+**How is the exchange rate determined?**
+By default it is the manual `usdToCny` number (`6.68`). With `"usdToCny": "auto"` it fetches the daily rate, caches
+it for 24 hours, and falls back to the last cache or `6.68`. The tooltip shows the rate, its source, and the date
+when it was automatic.
+
+**Can I change how often the footer refreshes?**
+Yes: `refreshMs` (200–5000, default 500) and `tweenMs` (0–2000, default 550). The timer pauses while the window is
+hidden.
 
 **Does it work in the TUI?**
 No. The TUI has `debug.turn_tokens`; this plugin is for the desktop GUI.

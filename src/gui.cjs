@@ -5,19 +5,29 @@ const {
   METRICS,
   buildTurns,
   cacheHitRate,
+  clampNumber,
   finite,
   formatCost,
   formatDuration,
   formatMoney,
+  normalizeCurrency,
   sameTotals,
 } = require("./core.cjs")
 
 const FOOTER_ATTR = "data-token-usage"
 const STYLE_ID = "opencode-token-usage-gui-style"
 const GUARD_KEY = "__OPENCODE_TOKEN_USAGE_GUI__"
-const REFRESH_MS = 500
+const DEFAULT_REFRESH_MS = 500
+const MIN_REFRESH_MS = 200
+const MAX_REFRESH_MS = 5000
+const DEFAULT_TWEEN_MS = 550
+const MAX_TWEEN_MS = 2000
 const MUTATION_DELAY_MS = 120
-const TWEEN_MS = 550
+const DEFAULT_USD_TO_CNY = 6.68
+const FX_CACHE_KEY = "opencode-token-usage-gui:fx"
+const FX_URL = "https://open.er-api.com/v6/latest/USD"
+const FX_TTL_MS = 24 * 60 * 60 * 1000
+const FX_TIMEOUT_MS = 8000
 
 const COPY = {
   en: {
@@ -31,6 +41,10 @@ const COPY = {
     total: "Total",
     tokens: "tokens",
     requests: "model requests",
+    rate: "Exchange rate",
+    rateManual: "manual",
+    rateAuto: "auto",
+    rateFallback: "fallback",
   },
   zh: {
     turn: "本轮",
@@ -43,6 +57,10 @@ const COPY = {
     total: "合计",
     tokens: "词元",
     requests: "次模型请求",
+    rate: "汇率",
+    rateManual: "手动",
+    rateAuto: "自动",
+    rateFallback: "兜底",
   },
 }
 
@@ -107,6 +125,28 @@ function pickLocale(ctx) {
   } catch {}
   if (typeof navigator !== "undefined" && navigator.language) return navigator.language.toLowerCase()
   return "en"
+}
+
+function readFxCache() {
+  try {
+    if (typeof localStorage === "undefined") return null
+    const raw = localStorage.getItem(FX_CACHE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    const rate = Number(parsed && parsed.rate)
+    if (!Number.isFinite(rate) || rate <= 0) return null
+    return { rate, at: Number(parsed && parsed.at) || 0 }
+  } catch {
+    return null
+  }
+}
+
+function writeFxCache(value) {
+  try {
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem(FX_CACHE_KEY, JSON.stringify(value))
+    }
+  } catch {}
 }
 
 function reducedMotion() {
@@ -265,6 +305,8 @@ function updateDetail(entry, turn, view) {
     `${copy.cacheRead} ${view.int(turn.totals.cacheRead)} · ${copy.cacheWrite} ${view.int(turn.totals.cacheWrite)} · ${copy.cacheHit} ${view.percent(turn.cacheHitRate)}`,
     `${view.int(turn.requests)} ${copy.requests}${turn.durationMs > 0 ? ` · ${formatDuration(turn.durationMs)}` : ""}`,
   ]
+  const rateLine = view.rateLine()
+  if (rateLine) lines.push(rateLine)
   entry.root.title = lines.join("\n")
 
   if (entry.costEl) {
@@ -312,9 +354,13 @@ module.exports = Plugin.define({
     const compact = options.compact === true
     const detailed = options.detailed === true
     const showCost = options.showCost !== false
-    const animate = options.animate !== false && !reducedMotion()
-    const currency = String(options.currency || "CNY").toUpperCase() === "USD" ? "USD" : "CNY"
-    const usdToCny = finite(options.usdToCny) > 0 ? finite(options.usdToCny) : 6.68
+    const refreshMs = clampNumber(options.refreshMs, MIN_REFRESH_MS, MAX_REFRESH_MS, DEFAULT_REFRESH_MS)
+    const tweenMs = clampNumber(options.tweenMs, 0, MAX_TWEEN_MS, DEFAULT_TWEEN_MS)
+    const animate = options.animate !== false && tweenMs > 0 && !reducedMotion()
+    const currency = normalizeCurrency(options.currency, locale)
+    const autoRate = String(options.usdToCny).toLowerCase() === "auto"
+    const manualRate = finite(options.usdToCny) > 0 ? finite(options.usdToCny) : DEFAULT_USD_TO_CNY
+    const rate = { value: manualRate, at: 0, source: "manual" }
     const intFmt = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 })
     const pctFmt = new Intl.NumberFormat(locale, {
       style: "percent",
@@ -331,10 +377,21 @@ module.exports = Plugin.define({
       currency,
       money: (usd) =>
         formatMoney(
-          finite(usd) * (currency === "CNY" ? usdToCny : 1),
+          finite(usd) * (currency === "CNY" ? rate.value : 1),
           currency,
           locale,
         ),
+      rateLine: () => {
+        if (currency !== "CNY" || !(rate.value > 0)) return ""
+        let source = copy.rateManual
+        if (rate.source === "auto") {
+          source = copy.rateAuto
+          if (rate.at > 0) source += ` (${new Date(rate.at).toISOString().slice(0, 10)})`
+        } else if (rate.source === "fallback") {
+          source = copy.rateFallback
+        }
+        return `${copy.rate} ${rate.value.toFixed(2)} · ${source}`
+      },
       int: (value) => intFmt.format(Math.round(finite(value))),
       percent: (value) =>
         value === null || value === undefined || !Number.isFinite(Number(value))
@@ -362,6 +419,7 @@ module.exports = Plugin.define({
     let mutationTimer
     let observedScroll = null
     let warned = false
+    let disposed = false
 
     const warn = (error) => {
       if (warned) return
@@ -391,7 +449,7 @@ module.exports = Plugin.define({
       let active = false
       for (const entry of state.values()) {
         if (!entry.startedAt) continue
-        const progress = Math.min(1, (now - entry.startedAt) / TWEEN_MS)
+        const progress = Math.min(1, (now - entry.startedAt) / tweenMs)
         const eased = 1 - Math.pow(1 - progress, 3)
         for (const key of METRICS) {
           entry.current[key] = entry.from[key] + (entry.target[key] - entry.from[key]) * eased
@@ -491,6 +549,7 @@ module.exports = Plugin.define({
     }
 
     const refresh = () => {
+      if (disposed || document.hidden) return
       try {
         sync()
       } catch (error) {
@@ -498,11 +557,77 @@ module.exports = Plugin.define({
       }
     }
 
+    const refreshDetails = () => {
+      if (disposed) return
+      for (const entry of state.values()) {
+        if (entry.turn) updateDetail(entry, entry.turn, view)
+      }
+    }
+
+    const loadRate = async () => {
+      if (!autoRate || currency !== "CNY" || disposed) return
+
+      const cached = readFxCache()
+      if (cached) {
+        rate.value = cached.rate
+        rate.at = cached.at
+        rate.source = "auto"
+        refreshDetails()
+        if (cached.at > 0 && Date.now() - cached.at < FX_TTL_MS) return
+      }
+
+      try {
+        if (typeof fetch !== "function") throw new Error("fetch is not available")
+        const controller = typeof AbortController === "function" ? new AbortController() : undefined
+        const timeout = controller ? setTimeout(() => controller.abort(), FX_TIMEOUT_MS) : undefined
+        let response
+        try {
+          response = await fetch(FX_URL, {
+            headers: { accept: "application/json" },
+            signal: controller && controller.signal,
+          })
+        } finally {
+          if (timeout) clearTimeout(timeout)
+        }
+        if (disposed) return
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+
+        const json = await response.json()
+        const value = Number(json && json.rates && json.rates.CNY)
+        if (!Number.isFinite(value) || value <= 0) throw new Error("invalid CNY rate")
+
+        rate.value = value
+        rate.at = Date.now()
+        rate.source = "auto"
+        writeFxCache({ rate: value, at: rate.at })
+        refreshDetails()
+      } catch (error) {
+        if (disposed) return
+        if (!cached) {
+          rate.value = manualRate
+          rate.at = 0
+          rate.source = "fallback"
+          refreshDetails()
+        }
+        console.warn(
+          "[token-usage-gui] exchange-rate fetch failed; using",
+          rate.value,
+          error && error.message ? error.message : error,
+        )
+      }
+    }
+
+    const onVisibilityChange = () => {
+      if (!document.hidden) refresh()
+    }
+
     const cleanup = () => {
+      disposed = true
       clearInterval(timer)
       if (mutationTimer) clearTimeout(mutationTimer)
       if (frame !== undefined) cancelAnimationFrame(frame)
       if (observer) observer.disconnect()
+      document.removeEventListener("visibilitychange", onVisibilityChange)
       for (const entry of state.values()) entry.root.remove()
       state.clear()
       if (styleNode) styleNode.remove()
@@ -517,8 +642,10 @@ module.exports = Plugin.define({
     }
     window[GUARD_KEY] = { cleanup }
 
+    document.addEventListener("visibilitychange", onVisibilityChange)
     refresh()
-    timer = setInterval(refresh, REFRESH_MS)
+    timer = setInterval(refresh, refreshMs)
+    void loadRate()
 
     return cleanup
   },
