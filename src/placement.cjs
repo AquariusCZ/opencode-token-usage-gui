@@ -19,6 +19,7 @@ function clamp(value, min, max) {
 /**
  * @param {object} input
  * @param {{top:number,bottom:number,left:number,right:number}} input.anchor footer rect
+ * @param {{left:number,right:number}} [input.info] info button rect
  * @param {{width:number,height:number}} input.pop card size
  * @param {{top:number,bottom:number,left:number,right:number}} input.bounds visible area
  * @param {number} [input.gap] space between footer and card
@@ -38,6 +39,8 @@ function placeTooltip(input) {
   const anchorBottom = Number.isFinite(anchor.bottom) ? anchor.bottom : anchorTop
   const anchorLeft = Number.isFinite(anchor.left) ? anchor.left : 0
   const anchorRight = Number.isFinite(anchor.right) ? anchor.right : anchorLeft
+  const infoRight =
+    input && input.info && Number.isFinite(input.info.right) ? input.info.right : anchorRight
   const popWidth = Math.max(0, Number(pop.width) || 0)
   const popHeight = Math.max(0, Number(pop.height) || 0)
 
@@ -75,7 +78,10 @@ function placeTooltip(input) {
     resolvedLeft = clamp(anchorRight + gap, left + pad, right - pad - popWidth)
     resolvedTop = clamp(anchorTop, top + pad, bottom - pad - popHeight)
   } else {
-    resolvedLeft = clamp(anchorLeft, left + pad, right - pad - popWidth)
+    // Vertical fallbacks align the card's right edge with the info button's
+    // right edge — directly under/over the button even on a wrapped footer — so
+    // the hover bridge from the button down/up into the portal stays short.
+    resolvedLeft = clamp(infoRight - popWidth, left + pad, right - pad - popWidth)
     const desiredTop = placement === "bottom" ? anchorBottom + gap : anchorTop - gap - popHeight
     resolvedTop = clamp(desiredTop, top + pad, bottom - pad - popHeight)
   }

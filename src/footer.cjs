@@ -675,6 +675,7 @@ function bindTooltip(entry, view) {
   let onScroll = null
   let onResize = null
   let onOutside = null
+  let followTimer = null
 
   const hovered = () => root.matches(":hover") || portal.matches(":hover")
 
@@ -694,6 +695,7 @@ function bindTooltip(entry, view) {
     const anchor = root.getBoundingClientRect()
     const result = placeTooltip({
       anchor: { top: anchor.top, bottom: anchor.bottom, left: anchor.left, right: anchor.right },
+      info: info.getBoundingClientRect(),
       pop: { width: pop.offsetWidth, height: pop.offsetHeight },
       bounds: area,
       gap: 8,
@@ -713,6 +715,11 @@ function bindTooltip(entry, view) {
     onResize = () => position()
     window.addEventListener("scroll", onScroll, true)
     window.addEventListener("resize", onResize)
+    if (!followTimer) {
+      followTimer = setInterval(() => {
+        if (open) position()
+      }, 160)
+    }
   }
 
   const unlisten = () => {
@@ -722,6 +729,10 @@ function bindTooltip(entry, view) {
     window.removeEventListener("resize", onResize)
     onScroll = null
     onResize = null
+    if (followTimer) {
+      clearInterval(followTimer)
+      followTimer = null
+    }
   }
 
   const attachOutside = () => {
@@ -744,6 +755,11 @@ function bindTooltip(entry, view) {
 
   const handleDocKey = (event) => {
     if (event.key !== "Escape" || !pinned) return
+    const target = event.target
+    const inSurface = root.contains(target) || portal.contains(target)
+    const onInfo = document.activeElement === info
+    const hovering = root.matches(":hover") || portal.matches(":hover")
+    if (!inSurface && !onInfo && !hovering) return
     event.stopPropagation()
     setPinned(false)
     hide(0)

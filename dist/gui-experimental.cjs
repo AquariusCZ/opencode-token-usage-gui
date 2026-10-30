@@ -254,6 +254,7 @@ var require_placement = __commonJS({
       const anchorBottom = Number.isFinite(anchor.bottom) ? anchor.bottom : anchorTop;
       const anchorLeft = Number.isFinite(anchor.left) ? anchor.left : 0;
       const anchorRight = Number.isFinite(anchor.right) ? anchor.right : anchorLeft;
+      const infoRight = input && input.info && Number.isFinite(input.info.right) ? input.info.right : anchorRight;
       const popWidth = Math.max(0, Number(pop.width) || 0);
       const popHeight = Math.max(0, Number(pop.height) || 0);
       const top = Number.isFinite(bounds.top) ? bounds.top : 0;
@@ -286,7 +287,7 @@ var require_placement = __commonJS({
         resolvedLeft = clamp(anchorRight + gap, left + pad, right - pad - popWidth);
         resolvedTop = clamp(anchorTop, top + pad, bottom - pad - popHeight);
       } else {
-        resolvedLeft = clamp(anchorLeft, left + pad, right - pad - popWidth);
+        resolvedLeft = clamp(infoRight - popWidth, left + pad, right - pad - popWidth);
         const desiredTop = placement === "bottom" ? anchorBottom + gap : anchorTop - gap - popHeight;
         resolvedTop = clamp(desiredTop, top + pad, bottom - pad - popHeight);
       }
@@ -930,6 +931,7 @@ var require_footer = __commonJS({
       let onScroll = null;
       let onResize = null;
       let onOutside = null;
+      let followTimer = null;
       const hovered = () => root.matches(":hover") || portal.matches(":hover");
       const position = () => {
         if (!open || !root.isConnected) return;
@@ -945,6 +947,7 @@ var require_footer = __commonJS({
         const anchor = root.getBoundingClientRect();
         const result = placeTooltip({
           anchor: { top: anchor.top, bottom: anchor.bottom, left: anchor.left, right: anchor.right },
+          info: info.getBoundingClientRect(),
           pop: { width: pop.offsetWidth, height: pop.offsetHeight },
           bounds: area2,
           gap: 8,
@@ -963,6 +966,11 @@ var require_footer = __commonJS({
         onResize = () => position();
         window.addEventListener("scroll", onScroll, true);
         window.addEventListener("resize", onResize);
+        if (!followTimer) {
+          followTimer = setInterval(() => {
+            if (open) position();
+          }, 160);
+        }
       };
       const unlisten = () => {
         if (!listening) return;
@@ -971,6 +979,10 @@ var require_footer = __commonJS({
         window.removeEventListener("resize", onResize);
         onScroll = null;
         onResize = null;
+        if (followTimer) {
+          clearInterval(followTimer);
+          followTimer = null;
+        }
       };
       const attachOutside = () => {
         if (onOutside) return;
@@ -990,6 +1002,11 @@ var require_footer = __commonJS({
       };
       const handleDocKey = (event) => {
         if (event.key !== "Escape" || !pinned) return;
+        const target = event.target;
+        const inSurface = root.contains(target) || portal.contains(target);
+        const onInfo = document.activeElement === info;
+        const hovering = root.matches(":hover") || portal.matches(":hover");
+        if (!inSurface && !onInfo && !hovering) return;
         event.stopPropagation();
         setPinned(false);
         hide(0);
@@ -1271,10 +1288,13 @@ function collectRows(scroll) {
   }
   return rows;
 }
-function findComposerFace() {
-  const faces = Array.from(
-    document.querySelectorAll('[data-slot="composer-face"]')
-  ).filter(isVisible);
+function findComposerFace(scroll) {
+  const panel = scroll && scroll.closest ? scroll.closest('[data-slot="session-chat-panel"]') : null;
+  const scope = panel || document;
+  let faces = Array.from(scope.querySelectorAll('[data-slot="composer-face"]')).filter(isVisible);
+  if (faces.length === 0 && scope !== document) {
+    faces = Array.from(document.querySelectorAll('[data-slot="composer-face"]')).filter(isVisible);
+  }
   if (faces.length === 0) return null;
   return faces.reduce((best, item) => area(item) > area(best) ? item : best, faces[0]);
 }
@@ -1432,6 +1452,7 @@ module.exports = Plugin.define({
     let observedScroll = null;
     let warned = false;
     let disposed = false;
+    let cleaned = false;
     const warn = (error) => {
       if (warned) return;
       warned = true;
@@ -1451,7 +1472,7 @@ module.exports = Plugin.define({
       observer.observe(scroll, { childList: true, subtree: true });
     };
     const ensureLiveHost = (scroll) => {
-      const face = findComposerFace();
+      const face = findComposerFace(scroll);
       const column = face && face.parentElement;
       const dock = column && column.closest('[data-component="session-composer-dock"]');
       if (face && column && dock) {
@@ -1732,6 +1753,8 @@ module.exports = Plugin.define({
       scheduleSample();
     };
     const cleanup = () => {
+      if (cleaned) return;
+      cleaned = true;
       disposed = true;
       clearTimeout(sampleTimer);
       if (mutationTimer) clearTimeout(mutationTimer);

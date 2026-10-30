@@ -172,11 +172,16 @@ function collectRows(scroll) {
 /**
  * Several composer faces can be mounted at once (permission or subagent
  * panels); pick the visible one with the largest box, like findScroll does.
+ * Scope the search to the active session pane so a larger secondary or
+ * permission composer cannot win over the pane that is actually on screen.
  */
-function findComposerFace() {
-  const faces = Array.from(
-    document.querySelectorAll('[data-slot="composer-face"]'),
-  ).filter(isVisible)
+function findComposerFace(scroll) {
+  const panel = scroll && scroll.closest ? scroll.closest('[data-slot="session-chat-panel"]') : null
+  const scope = panel || document
+  let faces = Array.from(scope.querySelectorAll('[data-slot="composer-face"]')).filter(isVisible)
+  if (faces.length === 0 && scope !== document) {
+    faces = Array.from(document.querySelectorAll('[data-slot="composer-face"]')).filter(isVisible)
+  }
   if (faces.length === 0) return null
   return faces.reduce((best, item) => (area(item) > area(best) ? item : best), faces[0])
 }
@@ -364,6 +369,7 @@ module.exports = Plugin.define({
     let observedScroll = null
     let warned = false
     let disposed = false
+    let cleaned = false
 
     const warn = (error) => {
       if (warned) return
@@ -399,7 +405,7 @@ module.exports = Plugin.define({
      * Older builds without a composer face fall back to the timeline tail.
      */
     const ensureLiveHost = (scroll) => {
-      const face = findComposerFace()
+      const face = findComposerFace(scroll)
       const column = face && face.parentElement
       const dock = column && column.closest('[data-component="session-composer-dock"]')
       if (face && column && dock) {
@@ -723,6 +729,8 @@ module.exports = Plugin.define({
     }
 
     const cleanup = () => {
+      if (cleaned) return
+      cleaned = true
       disposed = true
       clearTimeout(sampleTimer)
       if (mutationTimer) clearTimeout(mutationTimer)

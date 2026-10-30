@@ -41,7 +41,7 @@ test("a left-placed card falls below instead of switching to the right", () => {
 
   assert.equal(result.placement, "bottom")
   assert.equal(result.top, 438)
-  assert.equal(result.left, 100)
+  assert.equal(result.left, 152)
 })
 
 test("a right-placed card falls below instead of switching to the left", () => {
@@ -54,7 +54,7 @@ test("a right-placed card falls below instead of switching to the left", () => {
 
   assert.equal(result.placement, "bottom")
   assert.equal(result.top, 438)
-  assert.equal(result.left, 1200)
+  assert.equal(result.left, 1152)
 })
 
 test("the card falls above when the chosen side and the space below do not fit", () => {
@@ -66,7 +66,7 @@ test("the card falls above when the chosen side and the space below do not fit",
 
   assert.equal(result.placement, "top")
   assert.equal(result.top, 272)
-  assert.equal(result.left, 120)
+  assert.equal(result.left, 52)
 })
 
 test("a left-placed card is clamped vertically near the bottom", () => {
@@ -79,6 +79,19 @@ test("a left-placed card is clamped vertically near the bottom", () => {
   assert.equal(result.placement, "left")
   assert.equal(result.left, 144)
   assert.equal(result.top, 572)
+})
+
+test("vertical fallback aligns to the info button on a wrapped footer", () => {
+  const result = placeTooltip({
+    anchor: { top: 300, bottom: 355, left: 37, right: 630 },
+    info: { left: 84, right: 400 },
+    pop: { width: 348, height: 208 },
+    bounds: { top: 0, bottom: 800, left: 0, right: 800 },
+  })
+
+  assert.equal(result.placement, "bottom")
+  assert.equal(result.left, 52)
+  assert.equal(result.top, 363)
 })
 
 test("malformed input still degrades to the safe edge instead of NaN", () => {
