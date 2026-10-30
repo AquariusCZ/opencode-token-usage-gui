@@ -1,22 +1,65 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-color-scheme="light">
   <head>
     <meta charset="utf-8" />
-    <title>OpenCode Token Usage — illustrative mock</title>
+    <title>OpenCode Token Usage — interactive mock</title>
     <style>
       :root {
-        --bg: #f7f7f8;
-        --panel: #ffffff;
-        --sidebar: #fafafa;
-        --line: #e7e7e9;
-        --line-strong: #d9d9dc;
-        --text: #1c1c1f;
-        --muted: #71717a;
-        --faint: #a1a1aa;
-        --accent: #0f766e;
-        --accent-soft: #e6f4f1;
-        --bubble: #f0f0f1;
-        --shadow: 0 18px 50px rgba(24, 24, 27, 0.12), 0 2px 8px rgba(24, 24, 27, 0.06);
+        color-scheme: light;
+        --v2-background-bg-base: #ffffff;
+        --v2-background-bg-deep: #fafafa;
+        --v2-background-bg-layer-01: #fafafa;
+        --v2-background-bg-layer-02: #f2f2f2;
+        --v2-background-bg-layer-03: #eeeeee;
+        --v2-text-text-base: #161616;
+        --v2-text-text-muted: #5c5c5c;
+        --v2-text-text-faint: #808080;
+        --v2-text-text-accent: #3b5cf6;
+        --v2-border-border-muted: rgba(0, 0, 0, 0.08);
+        --v2-border-border-strong: rgba(0, 0, 0, 0.2);
+        --v2-border-border-focus: #3b5cf6;
+        --v2-overlay-simple-overlay-hover: rgba(0, 0, 0, 0.045);
+        --v2-overlay-simple-overlay-pressed: rgba(0, 0, 0, 0.075);
+        --v2-elevation-floating:
+          0 8px 16px rgba(0, 0, 0, 0.04), 0 4px 8px rgba(0, 0, 0, 0.08),
+          0 0 0 0.5px rgba(0, 0, 0, 0.12);
+        --v2-blue-300: #c3d4fd;
+        --v2-blue-500: #7698fd;
+        --v2-green-600: #49c970;
+        --v2-purple-500: #8271f8;
+        --v2-orange-600: #ff8648;
+
+        --bg: var(--v2-background-bg-base);
+        --panel: var(--v2-background-bg-base);
+        --sidebar: var(--v2-background-bg-deep);
+        --line: var(--v2-border-border-muted);
+        --line-strong: var(--v2-border-border-strong);
+        --text: var(--v2-text-text-base);
+        --muted: var(--v2-text-text-muted);
+        --faint: var(--v2-text-text-faint);
+        --accent: var(--v2-text-text-accent);
+        --accent-soft: var(--v2-background-bg-layer-02);
+        --bubble: var(--v2-background-bg-layer-02);
+        --shadow: var(--v2-elevation-floating);
+      }
+
+      [data-color-scheme="dark"] {
+        color-scheme: dark;
+        --v2-background-bg-base: #161616;
+        --v2-background-bg-deep: #080808;
+        --v2-background-bg-layer-01: #242424;
+        --v2-background-bg-layer-02: #2e2e2e;
+        --v2-background-bg-layer-03: #3a3a3a;
+        --v2-text-text-base: #fafafa;
+        --v2-text-text-muted: #aeaeae;
+        --v2-text-text-faint: #808080;
+        --v2-text-text-accent: #a2bcff;
+        --v2-border-border-muted: rgba(255, 255, 255, 0.08);
+        --v2-border-border-strong: rgba(255, 255, 255, 0.2);
+        --v2-border-border-focus: #7698fd;
+        --v2-overlay-simple-overlay-hover: rgba(255, 255, 255, 0.06);
+        --v2-overlay-simple-overlay-pressed: rgba(255, 255, 255, 0.1);
+        --panel: #1c1c1c;
       }
 
       * {
@@ -49,7 +92,7 @@
         align-items: center;
         gap: 18px;
         padding: 0 14px;
-        background: #fbfbfc;
+        background: var(--panel);
         border-bottom: 1px solid var(--line);
         user-select: none;
       }
@@ -64,7 +107,7 @@
         width: 11px;
         height: 11px;
         border-radius: 50%;
-        background: #d4d4d8;
+        background: var(--v2-grey-400, #d4d4d8);
       }
 
       .dot:nth-child(1) {
@@ -81,8 +124,8 @@
         width: 22px;
         height: 22px;
         border-radius: 6px;
-        background: #18181b;
-        color: white;
+        background: var(--text);
+        color: var(--bg);
         display: grid;
         place-items: center;
         font-size: 12px;
@@ -109,7 +152,7 @@
       }
 
       .tab.active {
-        background: #ffffff;
+        background: var(--panel);
         color: var(--text);
         box-shadow: inset 0 0 0 1px var(--line);
         font-weight: 500;
@@ -119,11 +162,11 @@
         width: 13px;
         height: 13px;
         border-radius: 4px;
-        background: #e4e4e7;
+        background: var(--v2-background-bg-layer-02);
         display: grid;
         place-items: center;
         font-size: 9px;
-        color: #52525b;
+        color: var(--muted);
       }
 
       .tab-plus {
@@ -148,16 +191,36 @@
         width: 15px;
         height: 15px;
         border-radius: 50%;
-        border: 2px solid #d4d4d8;
+        border: 2px solid var(--v2-border-border-strong);
         border-top-color: var(--accent);
         transform: rotate(35deg);
+      }
+
+      .theme-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 26px;
+        height: 26px;
+        margin-left: 4px;
+        border: 1px solid transparent;
+        border-radius: 7px;
+        background: transparent;
+        color: var(--muted);
+        font-size: 13px;
+        cursor: pointer;
+      }
+
+      .theme-toggle:hover {
+        background: var(--v2-overlay-simple-overlay-hover);
+        border-color: var(--line);
       }
 
       .window-controls {
         display: flex;
         gap: 14px;
-        margin-left: 6px;
-        color: #52525b;
+        margin-left: 4px;
+        color: var(--muted);
         font-size: 14px;
         letter-spacing: 1px;
       }
@@ -183,7 +246,7 @@
         gap: 9px;
         padding: 7px 10px;
         border-radius: 7px;
-        color: #3f3f46;
+        color: var(--muted);
       }
 
       .side-item .ico {
@@ -194,7 +257,8 @@
       }
 
       .side-item.active {
-        background: #fff;
+        background: var(--panel);
+        color: var(--text);
         box-shadow: inset 0 0 0 1px var(--line);
       }
 
@@ -218,7 +282,7 @@
         align-items: center;
         gap: 8px;
         padding: 6px 10px;
-        color: #27272a;
+        color: var(--text);
         font-weight: 500;
       }
 
@@ -238,7 +302,7 @@
       }
 
       .session.active {
-        background: #fff;
+        background: var(--panel);
         color: var(--text);
         box-shadow: inset 0 0 0 1px var(--line);
       }
@@ -247,7 +311,7 @@
         width: 5px;
         height: 5px;
         border-radius: 50%;
-        background: #d4d4d8;
+        background: var(--v2-border-border-strong);
       }
 
       .session.active .dot-mini {
@@ -276,7 +340,7 @@
         gap: 10px;
         padding: 0 22px;
         border-bottom: 1px solid var(--line);
-        background: rgba(255, 255, 255, 0.6);
+        background: var(--panel);
       }
 
       .crumb {
@@ -315,7 +379,7 @@
         border-radius: 14px;
         padding: 12px 16px;
         line-height: 1.55;
-        color: #27272a;
+        color: var(--text);
         font-size: 13px;
       }
 
@@ -335,21 +399,21 @@
       }
 
       .meta strong {
-        color: #52525b;
-        font-weight: 500;
+        color: var(--muted);
+        font-weight: 600;
       }
 
       .assistant p {
         margin: 0;
         line-height: 1.65;
-        color: #27272a;
+        color: var(--text);
         font-size: 13.2px;
       }
 
       code {
         font-family: "Cascadia Code", "Cascadia Mono", Consolas, monospace;
         font-size: 11.5px;
-        background: #ededf0;
+        background: var(--v2-background-bg-layer-02);
         border-radius: 4px;
         padding: 1px 5px;
       }
@@ -363,131 +427,19 @@
         padding-top: 3px;
       }
 
-      .tools .chev {
-        font-size: 9px;
-        color: var(--faint);
-      }
-
-      .footer-wrap {
-        position: relative;
-        margin-top: 11px;
-        padding: 8px 0 2px;
-      }
-
-      .token-footer {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: baseline;
-        column-gap: 6px;
-        row-gap: 3px;
-        color: var(--muted);
-        font-size: 12px;
-        line-height: 1.5;
-        font-variant-numeric: tabular-nums;
-        letter-spacing: 0.01em;
-      }
-
-      .tf-label {
-        color: var(--faint);
-        font-size: 11px;
-      }
-
-      .tf-item {
-        display: inline-flex;
-        align-items: baseline;
-        gap: 3px;
-        white-space: nowrap;
-      }
-
-      .tf-key {
-        color: var(--faint);
-        font-size: 11px;
-      }
-
-      .tf-val {
-        color: #52525b;
-      }
-
-      .tf-sep {
-        color: #c4c4c8;
-      }
-
-      .tf-total .tf-val,
-      .tf-cost {
-        color: #18181b;
-        font-weight: 500;
-      }
-
-      .tooltip {
-        position: absolute;
-        right: 0;
-        top: calc(100% + 8px);
-        width: 468px;
-        background: #fff;
-        border: 1px solid var(--line-strong);
-        border-radius: 10px;
-        box-shadow: var(--shadow);
-        padding: 13px 15px 12px;
-        color: var(--muted);
-        font-size: 11.5px;
-        line-height: 1.65;
-        font-variant-numeric: tabular-nums;
-      }
-
-      .tooltip::after {
-        content: "";
-        position: absolute;
-        right: 48px;
-        top: -6px;
-        width: 10px;
-        height: 10px;
-        background: #fff;
-        border-left: 1px solid var(--line-strong);
-        border-top: 1px solid var(--line-strong);
-        transform: rotate(45deg);
-      }
-
-      .tt-title {
-        color: #18181b;
-        font-weight: 600;
-        font-size: 12px;
-        margin-bottom: 3px;
-      }
-
-      .tt-row {
-        display: flex;
-        gap: 5px;
-      }
-
-      .tt-key {
-        color: var(--faint);
-      }
-
-      .tt-sep {
-        color: #d4d4d8;
-      }
-
-      .tt-rate {
-        margin-top: 7px;
-        padding-top: 7px;
-        border-top: 1px solid #f0f0f1;
-        color: var(--faint);
-        font-size: 10.5px;
-      }
-
       .composer-wrap {
         padding: 0 120px 18px;
         display: flex;
         align-items: flex-end;
-        background: linear-gradient(to bottom, rgba(247, 247, 248, 0), var(--bg) 30%);
+        background: linear-gradient(to bottom, transparent, var(--bg) 30%);
       }
 
       .composer {
         width: 100%;
-        background: #fff;
+        background: var(--panel);
         border: 1px solid var(--line-strong);
         border-radius: 14px;
-        box-shadow: 0 8px 26px rgba(24, 24, 27, 0.06);
+        box-shadow: 0 8px 26px rgba(0, 0, 0, 0.06);
         padding: 13px 14px 10px;
       }
 
@@ -515,7 +467,7 @@
         display: flex;
         align-items: center;
         gap: 5px;
-        color: #52525b;
+        color: var(--muted);
       }
 
       .select .caret {
@@ -528,8 +480,8 @@
         width: 30px;
         height: 30px;
         border-radius: 8px;
-        background: #18181b;
-        color: #fff;
+        background: var(--text);
+        color: var(--bg);
         display: grid;
         place-items: center;
         font-size: 14px;
@@ -539,10 +491,340 @@
         position: absolute;
         right: 28px;
         bottom: 10px;
-        color: #b4b4bb;
+        color: var(--faint);
         font-size: 9.5px;
         letter-spacing: 0.04em;
         user-select: none;
+      }
+
+      /* ---- Production footer styles (mirrors src/footer.cjs) ---- */
+      [data-token-usage] {
+        position: relative;
+        display: inline-flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        column-gap: 6px;
+        row-gap: 2px;
+        width: fit-content;
+        max-width: 100%;
+        margin: 6px 0 0 -9px;
+        padding: 5px 9px 6px;
+        border-radius: 8px;
+        color: var(--v2-text-text-muted);
+        font-size: 12px;
+        line-height: 1.5;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: 0.01em;
+        user-select: text;
+        -webkit-user-select: text;
+        transition: background-color 140ms ease;
+      }
+      [data-token-usage]:hover,
+      [data-token-usage][data-open="true"] {
+        background: var(--v2-overlay-simple-overlay-hover);
+      }
+      [data-token-usage][data-open]::before,
+      [data-token-usage][data-open]::after {
+        content: "";
+        position: absolute;
+        left: -8px;
+        right: -8px;
+        height: 8px;
+      }
+      [data-token-usage][data-open]::before {
+        top: -8px;
+      }
+      [data-token-usage][data-open]::after {
+        bottom: -8px;
+      }
+      [data-token-usage][data-pinned] {
+        background: var(--v2-overlay-simple-overlay-pressed);
+      }
+      [data-token-usage] .tu-label {
+        color: var(--v2-text-text-faint);
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0.02em;
+      }
+      [data-token-usage] .tu-group,
+      [data-token-usage] .tu-cost-group {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 6px;
+      }
+      [data-token-usage] .tu-item {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 4px;
+        white-space: nowrap;
+      }
+      [data-token-usage] .tu-key {
+        color: var(--v2-text-text-faint);
+        font-size: 11px;
+      }
+      [data-token-usage] .tu-val {
+        color: var(--v2-text-text-muted);
+      }
+      [data-token-usage] .tu-sep {
+        color: var(--v2-text-text-faint);
+        opacity: 0.4;
+        user-select: none;
+      }
+      [data-token-usage] [hidden] {
+        display: none !important;
+      }
+      [data-token-usage] .tu-total .tu-val,
+      [data-token-usage] .tu-cost {
+        color: var(--v2-text-text-base);
+        font-weight: 600;
+      }
+      [data-token-usage] .tu-info {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        align-self: center;
+        flex: none;
+        width: 16px;
+        height: 16px;
+        margin: 0 0 0 1px;
+        padding: 0;
+        border: 0;
+        border-radius: 50%;
+        background: transparent;
+        color: var(--v2-text-text-faint);
+        opacity: 0.45;
+        cursor: pointer;
+        transition: opacity 120ms ease, color 120ms ease, background-color 120ms ease;
+      }
+      [data-token-usage] .tu-info:hover {
+        opacity: 1;
+        color: var(--v2-text-text-base);
+        background: var(--v2-overlay-simple-overlay-hover);
+      }
+      [data-token-usage] .tu-info::after {
+        content: "";
+        position: absolute;
+        inset: -5px;
+      }
+      [data-token-usage] .tu-info:focus-visible {
+        outline: 2px solid var(--v2-border-border-focus);
+        outline-offset: 1px;
+        opacity: 1;
+      }
+      [data-token-usage][data-pinned] .tu-info {
+        opacity: 1;
+        color: var(--v2-text-text-base);
+      }
+      [data-token-usage] .tu-info svg {
+        display: block;
+        width: 12px;
+        height: 12px;
+      }
+      [data-token-usage] .tu-pop {
+        position: absolute;
+        z-index: 60;
+        left: 0;
+        top: 0;
+        box-sizing: border-box;
+        width: 348px;
+        max-width: calc(100vw - 24px);
+        padding: 14px 15px 13px;
+        border: 1px solid var(--v2-border-border-muted);
+        border-radius: 12px;
+        background: var(--v2-background-bg-layer-01);
+        box-shadow: var(--v2-elevation-floating);
+        color: var(--v2-text-text-base);
+        text-align: left;
+        white-space: normal;
+        font-size: 11.5px;
+        line-height: 1.45;
+        letter-spacing: 0;
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(4px) scale(0.985);
+        transform-origin: bottom left;
+        pointer-events: none;
+        user-select: none;
+        -webkit-user-select: none;
+        overflow-y: auto;
+        transition:
+          opacity 120ms ease,
+          transform 170ms cubic-bezier(0.16, 1, 0.3, 1),
+          visibility 0s linear 170ms;
+      }
+      [data-token-usage] .tu-pop[data-placement="bottom"] {
+        transform: translateY(-4px) scale(0.985);
+        transform-origin: top left;
+      }
+      [data-token-usage] .tu-pop[data-open="true"] {
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+        user-select: text;
+        -webkit-user-select: text;
+        transform: translateY(0) scale(1);
+        transition-delay: 0s;
+      }
+      [data-token-usage][data-pinned] .tu-pop {
+        pointer-events: auto;
+        user-select: text;
+        -webkit-user-select: text;
+      }
+      [data-token-usage] .tu-pop-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 14px;
+        margin-bottom: 11px;
+      }
+      [data-token-usage] .tu-pop-title {
+        min-width: 0;
+      }
+      [data-token-usage] .tu-eyebrow {
+        display: block;
+        margin-bottom: 3px;
+        color: var(--v2-text-text-faint);
+        font-size: 9.5px;
+        font-weight: 600;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+      }
+      [data-token-usage] .tu-pop-total {
+        display: flex;
+        align-items: baseline;
+        gap: 5px;
+        min-width: 0;
+      }
+      [data-token-usage] .tu-total-num {
+        color: var(--v2-text-text-base);
+        font-size: 20px;
+        font-weight: 600;
+        line-height: 1.15;
+        letter-spacing: -0.02em;
+        white-space: nowrap;
+      }
+      [data-token-usage] .tu-total-unit {
+        color: var(--v2-text-text-faint);
+        font-size: 10.5px;
+        white-space: nowrap;
+      }
+      [data-token-usage] .tu-cost-block {
+        flex: none;
+        padding-top: 1px;
+        text-align: right;
+      }
+      [data-token-usage] .tu-cost-main {
+        display: block;
+        color: var(--v2-text-text-base);
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 1.2;
+        letter-spacing: -0.01em;
+        white-space: nowrap;
+      }
+      [data-token-usage] .tu-cost-alt {
+        display: block;
+        margin-top: 1px;
+        color: var(--v2-text-text-faint);
+        font-size: 10px;
+        white-space: nowrap;
+      }
+      [data-token-usage] .tu-bar {
+        display: flex;
+        gap: 2px;
+        height: 6px;
+        margin: 0 0 11px;
+        border-radius: 3px;
+        background: var(--v2-background-bg-layer-03);
+        overflow: hidden;
+      }
+      [data-token-usage] .tu-seg {
+        display: block;
+        height: 100%;
+        border-radius: 2px;
+        flex-shrink: 1;
+        min-width: 2px;
+      }
+      [data-token-usage] .tu-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        column-gap: 16px;
+        row-gap: 5px;
+        margin: 0 0 10px;
+      }
+      [data-token-usage] .tu-cell {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+      }
+      [data-token-usage] .tu-dot {
+        flex: none;
+        width: 6px;
+        height: 6px;
+        border-radius: 2px;
+        opacity: 0.9;
+      }
+      [data-token-usage] .tu-dot-ring {
+        background: transparent !important;
+        border: 1px solid var(--v2-text-text-muted);
+        border-radius: 50%;
+        opacity: 0.8;
+      }
+      [data-token-usage] .tu-cell-key {
+        color: var(--v2-text-text-muted);
+        font-size: 11px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      [data-token-usage] .tu-cell-val {
+        margin-left: auto;
+        color: var(--v2-text-text-base);
+        font-size: 11.5px;
+        font-weight: 500;
+        white-space: nowrap;
+      }
+      [data-token-usage] .tu-pop-meta {
+        padding-top: 9px;
+        border-top: 1px solid var(--v2-border-border-muted);
+        color: var(--v2-text-text-muted);
+        font-size: 10.5px;
+      }
+      [data-token-usage] .tu-pop-rate {
+        margin-top: 2px;
+        color: var(--v2-text-text-muted);
+        font-size: 10px;
+      }
+      [data-token-usage] .tu-seg[data-metric="input"],
+      [data-token-usage] .tu-dot[data-metric="input"] {
+        background: var(--v2-blue-500);
+      }
+      [data-token-usage] .tu-seg[data-metric="output"],
+      [data-token-usage] .tu-dot[data-metric="output"] {
+        background: var(--v2-green-600);
+      }
+      [data-token-usage] .tu-seg[data-metric="reasoning"],
+      [data-token-usage] .tu-dot[data-metric="reasoning"] {
+        background: var(--v2-purple-500);
+      }
+      [data-token-usage] .tu-seg[data-metric="cacheRead"],
+      [data-token-usage] .tu-dot[data-metric="cacheRead"] {
+        background: var(--v2-blue-300);
+      }
+      [data-token-usage] .tu-seg[data-metric="cacheWrite"],
+      [data-token-usage] .tu-dot[data-metric="cacheWrite"] {
+        background: var(--v2-orange-600);
+      }
+      @media (prefers-reduced-motion: reduce) {
+        [data-token-usage],
+        [data-token-usage] .tu-pop,
+        [data-token-usage] .tu-pop[data-placement="bottom"],
+        [data-token-usage] .tu-pop[data-open="true"] {
+          transform: none;
+          transition: none;
+        }
       }
     </style>
   </head>
@@ -561,9 +843,10 @@
         <div class="context-pill">
           <span class="ring"></span>
           <span>48k</span>
-          <span style="color: #d4d4d8">·</span>
+          <span style="color: var(--v2-border-border-strong)">·</span>
           <span>¥12.40</span>
         </div>
+        <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Toggle theme">◐</button>
         <div class="window-controls"><span>—</span><span>▢</span><span>×</span></div>
       </div>
 
@@ -582,7 +865,7 @@
           <div class="session"><span class="dot-mini"></span>Benchmark notes</div>
 
           <div class="sidebar-footer">
-            Token Usage v0.2.0<br />
+            Token Usage v0.3.0<br />
             OpenCode Desktop 2.2.3
           </div>
         </aside>
@@ -605,41 +888,58 @@
               <div class="meta"><strong>Build</strong><span>·</span><span>DeepSeek V4.1 Flash 1017</span><span>·</span><span>2m 15s</span></div>
               <p>
                 Done. The footer aggregates every assistant request in the turn, including tool loops, so the
-                number matches the CLI's <code>debug.turn_tokens</code>. Hover it for the full breakdown.
+                number matches the CLI's <code>debug.turn_tokens</code>. Hover the line for a readable breakdown;
+                click the info button to pin the card while you copy numbers.
               </p>
-              <div class="tools">Used 6 tools · Shell, Read, Edit <span class="chev">▾</span></div>
+              <p>
+                The card is built from the desktop's own theme tokens, so it follows the app theme instead of
+                guessing a palette.
+              </p>
+              <div class="tools">Used 6 tools · Shell, Read, Edit</div>
 
-              <div class="footer-wrap">
-                <div class="token-footer">
-                  <span class="tf-label">This turn</span>
-                  <span class="tf-sep">·</span>
-                  <span class="tf-item"><span class="tf-key">Input</span><span class="tf-val">15,733</span></span>
-                  <span class="tf-sep">·</span>
-                  <span class="tf-item"><span class="tf-key">Output</span><span class="tf-val">6,250</span></span>
-                  <span class="tf-sep">·</span>
-                  <span class="tf-item"><span class="tf-key">Cache read</span><span class="tf-val">10,300,544</span></span>
-                  <span class="tf-sep">·</span>
-                  <span class="tf-item"><span class="tf-key">Cache hit</span><span class="tf-val">99.8%</span></span>
-                  <span class="tf-sep">·</span>
-                  <span class="tf-item tf-total"><span class="tf-key">Total</span><span class="tf-val">10,332,638</span></span>
-                  <span class="tf-sep">·</span>
-                  <span class="tf-cost">¥0.288</span>
-                </div>
+              <div data-token-usage="" role="note" aria-live="off">
+                <span class="tu-label">This turn</span>
+                <span class="tu-group"><span class="tu-sep" aria-hidden="true">·</span><span class="tu-item"><span class="tu-key">Input</span><span class="tu-val">15,733</span></span></span>
+                <span class="tu-group"><span class="tu-sep" aria-hidden="true">·</span><span class="tu-item"><span class="tu-key">Output</span><span class="tu-val">6,250</span></span></span>
+                <span class="tu-group"><span class="tu-sep" aria-hidden="true">·</span><span class="tu-item"><span class="tu-key">Cache read</span><span class="tu-val">10,300,544</span></span></span>
+                <span class="tu-group"><span class="tu-sep" aria-hidden="true">·</span><span class="tu-item"><span class="tu-key">Cache hit</span><span class="tu-val">99.8%</span></span></span>
+                <span class="tu-group"><span class="tu-sep" aria-hidden="true">·</span><span class="tu-item tu-total"><span class="tu-key">Total</span><span class="tu-val">10,332,638</span></span></span>
+                <span class="tu-cost-group"><span class="tu-sep" aria-hidden="true">·</span><span class="tu-cost">¥0.288</span></span>
+                <button class="tu-info" type="button" aria-label="Show token breakdown" aria-expanded="false">
+                  <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                    <circle cx="8" cy="8" r="6.3" fill="none" stroke="currentColor" stroke-width="1.25"></circle>
+                    <circle cx="8" cy="4.8" r="0.75" fill="currentColor"></circle>
+                    <path d="M8 7.2v4.1" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"></path>
+                  </svg>
+                </button>
 
-                <div class="tooltip">
-                  <div class="tt-title">This turn 10,332,638 tokens · ¥0.288 ($0.0431)</div>
-                  <div class="tt-row">
-                    <span><span class="tt-key">Input</span> 15,733</span><span class="tt-sep">·</span>
-                    <span><span class="tt-key">Output</span> 6,250</span><span class="tt-sep">·</span>
-                    <span><span class="tt-key">Reasoning</span> 10,111</span>
+                <div class="tu-pop" role="tooltip" aria-hidden="true">
+                  <div class="tu-pop-head">
+                    <div class="tu-pop-title">
+                      <span class="tu-eyebrow">Turn breakdown</span>
+                      <span class="tu-pop-total"><span class="tu-total-num">10,332,638</span><span class="tu-total-unit">tokens</span></span>
+                    </div>
+                    <div class="tu-cost-block">
+                      <span class="tu-cost-main">¥0.288</span>
+                      <span class="tu-cost-alt">≈ $0.0431</span>
+                    </div>
                   </div>
-                  <div class="tt-row">
-                    <span><span class="tt-key">Cache read</span> 10,300,544</span><span class="tt-sep">·</span>
-                    <span><span class="tt-key">Cache write</span> 0</span><span class="tt-sep">·</span>
-                    <span><span class="tt-key">Cache hit</span> 99.8%</span>
+                  <div class="tu-bar" role="img" aria-label="Token composition">
+                    <span class="tu-seg" data-metric="input" style="width: 0.1523%"></span>
+                    <span class="tu-seg" data-metric="output" style="width: 0.0605%"></span>
+                    <span class="tu-seg" data-metric="reasoning" style="width: 0.0979%"></span>
+                    <span class="tu-seg" data-metric="cacheRead" style="width: 99.6894%"></span>
                   </div>
-                  <div class="tt-row"><span>21 model requests · 2m 15s</span></div>
-                  <div class="tt-rate">Exchange rate 6.68 · manual</div>
+                  <div class="tu-grid">
+                    <div class="tu-cell"><span class="tu-dot" data-metric="input"></span><span class="tu-cell-key">Input</span><span class="tu-cell-val">15,733</span></div>
+                    <div class="tu-cell"><span class="tu-dot" data-metric="output"></span><span class="tu-cell-key">Output</span><span class="tu-cell-val">6,250</span></div>
+                    <div class="tu-cell"><span class="tu-dot" data-metric="reasoning"></span><span class="tu-cell-key">Reasoning</span><span class="tu-cell-val">10,111</span></div>
+                    <div class="tu-cell"><span class="tu-dot" data-metric="cacheRead"></span><span class="tu-cell-key">Cache read</span><span class="tu-cell-val">10,300,544</span></div>
+                    <div class="tu-cell"><span class="tu-dot" data-metric="cacheWrite"></span><span class="tu-cell-key">Cache write</span><span class="tu-cell-val">0</span></div>
+                    <div class="tu-cell"><span class="tu-dot tu-dot-ring"></span><span class="tu-cell-key">Cache hit</span><span class="tu-cell-val">99.8%</span></div>
+                  </div>
+                  <div class="tu-pop-meta">21 model requests · 2m 15s</div>
+                  <div class="tu-pop-rate">Exchange rate 6.68 · manual</div>
                 </div>
               </div>
             </div>
@@ -658,9 +958,91 @@
             </div>
           </div>
 
-          <div class="mock-label">Illustrative mock · not a real session</div>
+          <div class="mock-label">Illustrative mock · hover the footer · click ⓘ to pin</div>
         </main>
       </div>
     </div>
+
+    <script>
+      (() => {
+        const root = document.querySelector("[data-token-usage]")
+        const button = root.querySelector(".tu-info")
+        const pop = root.querySelector(".tu-pop")
+        let pinned = false
+        let showTimer
+        let hideTimer
+
+        const position = () => {
+          const rootRect = root.getBoundingClientRect()
+          const top = rootRect.top - pop.offsetHeight - 8
+          pop.style.left = "0px"
+          pop.style.top = `${Math.round(top - rootRect.top)}px`
+          pop.dataset.placement = "top"
+        }
+
+        const show = () => {
+          clearTimeout(showTimer)
+          clearTimeout(hideTimer)
+          position()
+          root.setAttribute("data-open", "true")
+          pop.setAttribute("data-open", "true")
+          pop.setAttribute("aria-hidden", "false")
+          button.setAttribute("aria-expanded", "true")
+        }
+
+        const hide = () => {
+          if (pinned) return
+          root.removeAttribute("data-open")
+          pop.removeAttribute("data-open")
+          pop.setAttribute("aria-hidden", "true")
+          button.setAttribute("aria-expanded", "false")
+        }
+
+        root.addEventListener("pointerenter", () => {
+          if (pinned) return
+          clearTimeout(hideTimer)
+          showTimer = setTimeout(show, 120)
+        })
+        root.addEventListener("pointerleave", () => {
+          clearTimeout(showTimer)
+          hideTimer = setTimeout(() => {
+            if (!pinned && !button.matches(":focus-visible")) hide()
+          }, 80)
+        })
+        button.addEventListener("focus", show)
+        button.addEventListener("blur", () => {
+          if (!pinned) hide()
+        })
+        button.addEventListener("click", (event) => {
+          event.preventDefault()
+          pinned = !pinned
+          root.toggleAttribute("data-pinned", pinned)
+          button.setAttribute("aria-label", pinned ? "Hide token breakdown" : "Show token breakdown")
+          if (pinned) show()
+          else if (!root.matches(":hover") && !button.matches(":focus-visible")) hide()
+        })
+        root.addEventListener("keydown", (event) => {
+          if (event.key !== "Escape") return
+          pinned = false
+          root.removeAttribute("data-pinned")
+          button.setAttribute("aria-label", "Show token breakdown")
+          hide()
+        })
+        document.addEventListener("pointerdown", (event) => {
+          if (!pinned || root.contains(event.target)) return
+          pinned = false
+          root.removeAttribute("data-pinned")
+          button.setAttribute("aria-label", "Show token breakdown")
+          hide()
+        })
+
+        const toggle = document.getElementById("theme-toggle")
+        toggle.addEventListener("click", () => {
+          const dark = document.documentElement.getAttribute("data-color-scheme") === "dark"
+          document.documentElement.setAttribute("data-color-scheme", dark ? "light" : "dark")
+          toggle.setAttribute("aria-label", dark ? "Switch to dark theme" : "Switch to light theme")
+        })
+      })()
+    </script>
   </body>
 </html>

@@ -1,4 +1,4 @@
-/*! opencode-token-usage-gui v0.2.2 | MIT | https://github.com/AquariusCZ/opencode-token-usage-gui */
+/*! opencode-token-usage-gui v0.3.0 | MIT | https://github.com/AquariusCZ/opencode-token-usage-gui */
 "use strict";
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
@@ -21,6 +21,7 @@ var require_core = __commonJS({
       "cacheWrite",
       "total"
     ]);
+    var TOKEN_KEYS = Object.freeze(["input", "output", "reasoning", "cacheRead", "cacheWrite"]);
     function finite2(value) {
       const number = Number(value);
       return Number.isFinite(number) ? number : 0;
@@ -90,6 +91,16 @@ var require_core = __commonJS({
       if (prompt <= 0) return null;
       return finite2(totals.cacheRead) / prompt * 100;
     }
+    function tokenComposition(totals) {
+      const values = TOKEN_KEYS.map((key) => Math.max(0, finite2(totals && totals[key])));
+      const sum = values.reduce((total, value) => total + value, 0);
+      const denominator = sum > 0 ? sum : Math.max(0, finite2(totals && totals.total));
+      return TOKEN_KEYS.map((key, index) => ({
+        key,
+        value: values[index],
+        share: denominator > 0 ? values[index] / denominator : 0
+      }));
+    }
     function emptyTurn(id) {
       return {
         id,
@@ -152,7 +163,7 @@ var require_core = __commonJS({
         Math.round(finite2(value))
       );
     }
-    function formatCost2(value, locale) {
+    function formatCost(value, locale) {
       const amount = Math.max(0, finite2(value));
       if (amount === 0) return "$0";
       if (amount < 5e-6) return "<$0.00001";
@@ -166,7 +177,7 @@ var require_core = __commonJS({
     function formatMoney2(value, currency, locale) {
       const amount = Math.max(0, finite2(value));
       const code = String(currency || "CNY").toUpperCase();
-      if (code === "USD") return formatCost2(amount, locale);
+      if (code === "USD") return formatCost(amount, locale);
       if (amount === 0) return "\xA50";
       if (amount < 5e-5) return "<\xA50.0001";
       const digits = amount < 0.01 ? 4 : amount < 1 ? 3 : 2;
@@ -184,7 +195,7 @@ var require_core = __commonJS({
         maximumFractionDigits: 1
       }).format(Number(value) / 100);
     }
-    function formatDuration2(milliseconds) {
+    function formatDuration(milliseconds) {
       const seconds = Math.max(0, Math.round(finite2(milliseconds) / 1e3));
       if (seconds < 60) return `${seconds}s`;
       const minutes = Math.floor(seconds / 60);
@@ -196,6 +207,7 @@ var require_core = __commonJS({
     }
     module2.exports = {
       METRICS: METRICS2,
+      TOKEN_KEYS,
       addUsage,
       approachValue: approachValue2,
       buildTurns: buildTurns2,
@@ -203,8 +215,8 @@ var require_core = __commonJS({
       clampNumber: clampNumber2,
       emptyTotals,
       finite: finite2,
-      formatCost: formatCost2,
-      formatDuration: formatDuration2,
+      formatCost,
+      formatDuration,
       formatInt,
       formatMoney: formatMoney2,
       formatPercent,
@@ -212,8 +224,818 @@ var require_core = __commonJS({
       normalizeRefreshMode: normalizeRefreshMode2,
       sameTotals: sameTotals2,
       smoothingAlpha: smoothingAlpha2,
+      tokenComposition,
       tokenUsage,
       visibleMessages
+    };
+  }
+});
+
+// src/placement.cjs
+var require_placement = __commonJS({
+  "src/placement.cjs"(exports2, module2) {
+    "use strict";
+    function clamp(value, min, max) {
+      if (!(max > min)) return min;
+      return Math.min(max, Math.max(min, value));
+    }
+    function placeTooltip(input) {
+      const anchor = input && input.anchor || {};
+      const pop = input && input.pop || {};
+      const bounds = input && input.bounds || {};
+      const gap = Number.isFinite(input && input.gap) ? input.gap : 8;
+      const pad = Number.isFinite(input && input.pad) ? input.pad : 8;
+      const anchorTop = Number.isFinite(anchor.top) ? anchor.top : 0;
+      const anchorBottom = Number.isFinite(anchor.bottom) ? anchor.bottom : anchorTop;
+      const anchorLeft = Number.isFinite(anchor.left) ? anchor.left : 0;
+      const popWidth = Math.max(0, Number(pop.width) || 0);
+      const popHeight = Math.max(0, Number(pop.height) || 0);
+      const top = Number.isFinite(bounds.top) ? bounds.top : 0;
+      const bottom = Number.isFinite(bounds.bottom) ? bounds.bottom : top;
+      const left = Number.isFinite(bounds.left) ? bounds.left : 0;
+      const right = Number.isFinite(bounds.right) ? bounds.right : left;
+      const roomAbove = anchorTop - gap - popHeight - (top + pad);
+      const roomBelow = bottom - pad - (anchorBottom + gap) - popHeight;
+      let placement = "top";
+      if (roomAbove >= 0) placement = "top";
+      else if (roomBelow >= 0) placement = "bottom";
+      else placement = roomBelow > roomAbove ? "bottom" : "top";
+      const desiredTop = placement === "top" ? anchorTop - gap - popHeight : anchorBottom + gap;
+      const maxTop = bottom - pad - popHeight;
+      const resolvedTop = clamp(desiredTop, top + pad, maxTop);
+      const maxLeft = right - pad - popWidth;
+      const resolvedLeft = clamp(anchorLeft, left + pad, maxLeft);
+      return {
+        left: Math.round(resolvedLeft),
+        top: Math.round(resolvedTop),
+        placement
+      };
+    }
+    module2.exports = { placeTooltip };
+  }
+});
+
+// src/footer.cjs
+var require_footer = __commonJS({
+  "src/footer.cjs"(exports2, module2) {
+    "use strict";
+    var { TOKEN_KEYS, formatCost, formatDuration, tokenComposition } = require_core();
+    var { placeTooltip } = require_placement();
+    var FOOTER_ATTR = "data-token-usage";
+    var SHOW_DELAY_MS = 120;
+    var HIDE_DELAY_MS = 80;
+    var popoverSeq = 0;
+    var CSS2 = `
+[${FOOTER_ATTR}] {
+  position: relative;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 6px;
+  row-gap: 2px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 6px 0 0 -9px;
+  padding: 5px 9px 6px;
+  border-radius: 8px;
+  color: var(--v2-text-text-muted, #a3a3a3);
+  font-size: 12px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  user-select: text;
+  -webkit-user-select: text;
+  transition: background-color 140ms ease;
+}
+[${FOOTER_ATTR}]:hover,
+[${FOOTER_ATTR}][data-open="true"] {
+  background: var(--v2-overlay-simple-overlay-hover, rgba(127, 127, 127, 0.08));
+}
+[${FOOTER_ATTR}][data-open]::before,
+[${FOOTER_ATTR}][data-open]::after {
+  content: "";
+  position: absolute;
+  left: -8px;
+  right: -8px;
+  height: 8px;
+}
+[${FOOTER_ATTR}][data-open]::before {
+  top: -8px;
+}
+[${FOOTER_ATTR}][data-open]::after {
+  bottom: -8px;
+}
+[${FOOTER_ATTR}][data-pinned] {
+  background: var(--v2-overlay-simple-overlay-pressed, rgba(127, 127, 127, 0.12));
+}
+[${FOOTER_ATTR}] .tu-label {
+  color: var(--v2-text-text-faint, #8a8a8a);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+[${FOOTER_ATTR}] .tu-group,
+[${FOOTER_ATTR}] .tu-cost-group {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+[${FOOTER_ATTR}] .tu-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
+}
+[${FOOTER_ATTR}] .tu-key {
+  color: var(--v2-text-text-faint, #8a8a8a);
+  font-size: 11px;
+}
+[${FOOTER_ATTR}] .tu-val {
+  color: var(--v2-text-text-muted, #a3a3a3);
+}
+[${FOOTER_ATTR}] .tu-sep {
+  color: var(--v2-text-text-faint, #8a8a8a);
+  opacity: 0.4;
+  user-select: none;
+}
+[${FOOTER_ATTR}] [hidden] {
+  display: none !important;
+}
+[${FOOTER_ATTR}] .tu-total .tu-val {
+  color: var(--v2-text-text-base, #d4d4d4);
+  font-weight: 600;
+}
+[${FOOTER_ATTR}] .tu-cost {
+  color: var(--v2-text-text-base, #d4d4d4);
+  font-weight: 600;
+}
+[${FOOTER_ATTR}] .tu-info {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 0 0 0 1px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--v2-text-text-faint, #8a8a8a);
+  opacity: 0.45;
+  cursor: pointer;
+  transition: opacity 120ms ease, color 120ms ease, background-color 120ms ease;
+}
+[${FOOTER_ATTR}] .tu-info:hover {
+  opacity: 1;
+  color: var(--v2-text-text-base, #d4d4d4);
+  background: var(--v2-overlay-simple-overlay-hover, rgba(127, 127, 127, 0.1));
+}
+[${FOOTER_ATTR}] .tu-info::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+}
+[${FOOTER_ATTR}] .tu-info:focus-visible {
+  outline: 2px solid var(--v2-border-border-focus, #3b5cf6);
+  outline-offset: 1px;
+  opacity: 1;
+}
+[${FOOTER_ATTR}][data-pinned] .tu-info {
+  opacity: 1;
+  color: var(--v2-text-text-base, #d4d4d4);
+}
+[${FOOTER_ATTR}] .tu-info svg {
+  display: block;
+  width: 12px;
+  height: 12px;
+}
+[${FOOTER_ATTR}] .tu-pop {
+  position: absolute;
+  z-index: 60;
+  left: 0;
+  top: 0;
+  box-sizing: border-box;
+  width: 348px;
+  max-width: calc(100vw - 24px);
+  padding: 14px 15px 13px;
+  border: 1px solid var(--v2-border-border-muted, rgba(255, 255, 255, 0.1));
+  border-radius: 12px;
+  background: var(--v2-background-bg-layer-01, #1f1f22);
+  box-shadow: var(
+    --v2-elevation-floating,
+    0 12px 32px rgba(0, 0, 0, 0.28),
+    0 2px 8px rgba(0, 0, 0, 0.18)
+  );
+  color: var(--v2-text-text-base, #f2f2f2);
+  text-align: left;
+  white-space: normal;
+  font-size: 11.5px;
+  line-height: 1.45;
+  letter-spacing: 0;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(4px) scale(0.985);
+  transform-origin: bottom left;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  overflow-y: auto;
+  transition:
+    opacity 120ms ease,
+    transform 170ms cubic-bezier(0.16, 1, 0.3, 1),
+    visibility 0s linear 170ms;
+}
+[${FOOTER_ATTR}] .tu-pop[data-placement="bottom"] {
+  transform: translateY(-4px) scale(0.985);
+  transform-origin: top left;
+}
+[${FOOTER_ATTR}] .tu-pop[data-open="true"] {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  user-select: text;
+  -webkit-user-select: text;
+  transform: translateY(0) scale(1);
+  transition-delay: 0s;
+}
+[${FOOTER_ATTR}][data-pinned] .tu-pop {
+  pointer-events: auto;
+  user-select: text;
+  -webkit-user-select: text;
+}
+[${FOOTER_ATTR}] .tu-pop[hidden] {
+  display: none !important;
+}
+[${FOOTER_ATTR}] .tu-pop-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 11px;
+}
+[${FOOTER_ATTR}] .tu-pop-title {
+  min-width: 0;
+}
+[${FOOTER_ATTR}] .tu-eyebrow {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--v2-text-text-faint, #8a8a8a);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+[${FOOTER_ATTR}] .tu-pop-total {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+}
+[${FOOTER_ATTR}] .tu-total-num {
+  color: var(--v2-text-text-base, #f2f2f2);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+[${FOOTER_ATTR}] .tu-total-unit {
+  color: var(--v2-text-text-faint, #8a8a8a);
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+[${FOOTER_ATTR}] .tu-cost-block {
+  flex: none;
+  padding-top: 1px;
+  text-align: right;
+}
+[${FOOTER_ATTR}] .tu-cost-main {
+  display: block;
+  color: var(--v2-text-text-base, #f2f2f2);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+[${FOOTER_ATTR}] .tu-cost-alt {
+  display: block;
+  margin-top: 1px;
+  color: var(--v2-text-text-faint, #8a8a8a);
+  font-size: 10px;
+  white-space: nowrap;
+}
+[${FOOTER_ATTR}] .tu-bar {
+  display: flex;
+  gap: 2px;
+  height: 6px;
+  margin: 0 0 11px;
+  border-radius: 3px;
+  background: var(--v2-background-bg-layer-03, rgba(127, 127, 127, 0.16));
+  overflow: hidden;
+}
+[${FOOTER_ATTR}] .tu-seg {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  flex-shrink: 1;
+  min-width: 2px;
+  transition: width 220ms ease;
+}
+[${FOOTER_ATTR}] .tu-seg[hidden] {
+  display: none !important;
+}
+[${FOOTER_ATTR}] .tu-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  column-gap: 16px;
+  row-gap: 5px;
+  margin: 0 0 10px;
+}
+[${FOOTER_ATTR}] .tu-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+[${FOOTER_ATTR}] .tu-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 2px;
+  opacity: 0.9;
+}
+[${FOOTER_ATTR}] .tu-dot-ring {
+  background: transparent !important;
+  border: 1px solid var(--v2-text-text-muted, #a3a3a3);
+  border-radius: 50%;
+  opacity: 0.8;
+}
+[${FOOTER_ATTR}] .tu-cell-key {
+  color: var(--v2-text-text-muted, #a3a3a3);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+[${FOOTER_ATTR}] .tu-cell-val {
+  margin-left: auto;
+  color: var(--v2-text-text-base, #f2f2f2);
+  font-size: 11.5px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+[${FOOTER_ATTR}] .tu-pop-meta {
+  padding-top: 9px;
+  border-top: 1px solid var(--v2-border-border-muted, rgba(127, 127, 127, 0.16));
+  color: var(--v2-text-text-muted, #a3a3a3);
+  font-size: 10.5px;
+}
+[${FOOTER_ATTR}] .tu-pop-rate {
+  margin-top: 2px;
+  color: var(--v2-text-text-muted, #a3a3a3);
+  font-size: 10px;
+}
+[${FOOTER_ATTR}] .tu-seg[data-metric="input"],
+[${FOOTER_ATTR}] .tu-dot[data-metric="input"] {
+  background: var(--v2-blue-500, #7698fd);
+}
+[${FOOTER_ATTR}] .tu-seg[data-metric="output"],
+[${FOOTER_ATTR}] .tu-dot[data-metric="output"] {
+  background: var(--v2-green-600, #49c970);
+}
+[${FOOTER_ATTR}] .tu-seg[data-metric="reasoning"],
+[${FOOTER_ATTR}] .tu-dot[data-metric="reasoning"] {
+  background: var(--v2-purple-500, #8271f8);
+}
+[${FOOTER_ATTR}] .tu-seg[data-metric="cacheRead"],
+[${FOOTER_ATTR}] .tu-dot[data-metric="cacheRead"] {
+  background: var(--v2-blue-300, #c3d4fd);
+}
+[${FOOTER_ATTR}] .tu-seg[data-metric="cacheWrite"],
+[${FOOTER_ATTR}] .tu-dot[data-metric="cacheWrite"] {
+  background: var(--v2-orange-600, #ff8648);
+}
+@media (prefers-reduced-motion: reduce) {
+  [${FOOTER_ATTR}],
+  [${FOOTER_ATTR}] .tu-pop,
+  [${FOOTER_ATTR}] .tu-pop[data-placement="bottom"],
+  [${FOOTER_ATTR}] .tu-pop[data-open="true"] {
+    transition: none;
+    transform: none;
+  }
+}
+`;
+    function make(tag, className, text) {
+      const element = document.createElement(tag);
+      if (className) element.className = className;
+      if (text !== void 0) element.textContent = text;
+      return element;
+    }
+    function setText2(node, text) {
+      if (!node) return;
+      if (node.firstChild && node.firstChild.nodeType === 3 && node.childNodes.length === 1) {
+        if (node.firstChild.nodeValue !== text) node.firstChild.nodeValue = text;
+        return;
+      }
+      node.textContent = text;
+    }
+    function separator() {
+      const node = make("span", "tu-sep", "\xB7");
+      node.setAttribute("aria-hidden", "true");
+      return node;
+    }
+    function infoIcon() {
+      const namespace = "http://www.w3.org/2000/svg";
+      const svg = document.createElementNS(namespace, "svg");
+      svg.setAttribute("viewBox", "0 0 16 16");
+      svg.setAttribute("aria-hidden", "true");
+      svg.setAttribute("focusable", "false");
+      const circle = document.createElementNS(namespace, "circle");
+      circle.setAttribute("cx", "8");
+      circle.setAttribute("cy", "8");
+      circle.setAttribute("r", "6.3");
+      circle.setAttribute("fill", "none");
+      circle.setAttribute("stroke", "currentColor");
+      circle.setAttribute("stroke-width", "1.25");
+      const dot = document.createElementNS(namespace, "circle");
+      dot.setAttribute("cx", "8");
+      dot.setAttribute("cy", "4.8");
+      dot.setAttribute("r", "0.75");
+      dot.setAttribute("fill", "currentColor");
+      const stem = document.createElementNS(namespace, "path");
+      stem.setAttribute("d", "M8 7.2v4.1");
+      stem.setAttribute("fill", "none");
+      stem.setAttribute("stroke", "currentColor");
+      stem.setAttribute("stroke-width", "1.25");
+      stem.setAttribute("stroke-linecap", "round");
+      svg.append(circle, dot, stem);
+      return svg;
+    }
+    function createFooter2(turn, view) {
+      const copy = view.copy;
+      const root = document.createElement("div");
+      root.setAttribute(FOOTER_ATTR, "");
+      root.setAttribute("role", "note");
+      root.setAttribute("aria-live", "off");
+      const values = {};
+      const groups = {};
+      root.append(make("span", "tu-label", copy.turn));
+      const item = (key, text, className) => {
+        const group = make("span", "tu-group");
+        const wrap = make("span", className ? `tu-item ${className}` : "tu-item");
+        const value = make("span", "tu-val");
+        wrap.append(make("span", "tu-key", text), value);
+        group.append(separator(), wrap);
+        root.append(group);
+        values[key] = value;
+        groups[key] = group;
+        return wrap;
+      };
+      item("input", copy.input);
+      item("output", copy.output);
+      if (!view.compact) {
+        if (view.detailed) item("reasoning", copy.reasoning);
+        item("cacheRead", copy.cacheRead);
+        if (view.detailed) item("cacheWrite", copy.cacheWrite);
+        item("cacheHit", copy.cacheHit);
+      }
+      item("total", copy.total, "tu-total");
+      let costEl = null;
+      let costGroup = null;
+      if (view.showCost) {
+        costGroup = make("span", "tu-cost-group");
+        costEl = make("span", "tu-cost");
+        costGroup.append(separator(), costEl);
+        root.append(costGroup);
+      }
+      const info = document.createElement("button");
+      info.type = "button";
+      info.className = "tu-info";
+      info.setAttribute("aria-label", copy.showDetails);
+      info.setAttribute("aria-expanded", "false");
+      info.append(infoIcon());
+      root.append(info);
+      const pop = make("div", "tu-pop");
+      pop.id = `tu-pop-${++popoverSeq}`;
+      pop.setAttribute("role", "tooltip");
+      pop.setAttribute("aria-hidden", "true");
+      info.setAttribute("aria-describedby", pop.id);
+      const head = make("div", "tu-pop-head");
+      const title = make("div", "tu-pop-title");
+      title.append(make("span", "tu-eyebrow", copy.breakdown));
+      const totalLine = make("span", "tu-pop-total");
+      const totalNum = make("span", "tu-total-num");
+      const totalUnit = make("span", "tu-total-unit", copy.tokens);
+      totalLine.append(totalNum, totalUnit);
+      title.append(totalLine);
+      const costBlock = make("div", "tu-cost-block");
+      const costMain = make("span", "tu-cost-main");
+      const costAlt = make("span", "tu-cost-alt");
+      costBlock.append(costMain, costAlt);
+      head.append(title, costBlock);
+      pop.append(head);
+      const bar = make("div", "tu-bar");
+      bar.setAttribute("role", "img");
+      bar.setAttribute("aria-label", copy.composition);
+      const segments = {};
+      for (const key of TOKEN_KEYS) {
+        const segment = make("span", "tu-seg");
+        segment.dataset.metric = key;
+        bar.append(segment);
+        segments[key] = segment;
+      }
+      pop.append(bar);
+      const grid = make("div", "tu-grid");
+      const cells = {};
+      for (const key of TOKEN_KEYS) {
+        const cell = make("div", "tu-cell");
+        const dot = make("span", "tu-dot");
+        dot.dataset.metric = key;
+        const value = make("span", "tu-cell-val");
+        cell.append(dot, make("span", "tu-cell-key", copy[key]), value);
+        grid.append(cell);
+        cells[key] = value;
+      }
+      const hitCell = make("div", "tu-cell");
+      const hitDot = make("span", "tu-dot tu-dot-ring");
+      const hitValue = make("span", "tu-cell-val");
+      hitCell.append(hitDot, make("span", "tu-cell-key", copy.cacheHit), hitValue);
+      grid.append(hitCell);
+      pop.append(grid);
+      const meta = make("div", "tu-pop-meta");
+      const rate = make("div", "tu-pop-rate");
+      pop.append(meta, rate);
+      root.append(pop);
+      const entry = {
+        root,
+        values,
+        groups,
+        costEl,
+        costGroup,
+        info,
+        pop,
+        bar,
+        totalNum,
+        costMain,
+        costAlt,
+        costBlock,
+        segments,
+        cells,
+        hitCell,
+        hitValue,
+        meta,
+        rate,
+        turn,
+        targetEl: null,
+        scrollEl: null,
+        reposition: null,
+        isOpen: () => false,
+        dispose: null
+      };
+      updateFooter2(entry, turn, view);
+      return entry;
+    }
+    function updateFooter2(entry, turn, view) {
+      if (!entry || !turn) return;
+      entry.turn = turn;
+      const copy = view.copy;
+      const totals = turn.totals;
+      const rateLine = view.rateLine();
+      const signature = [
+        totals.input,
+        totals.output,
+        totals.reasoning,
+        totals.cacheRead,
+        totals.cacheWrite,
+        totals.total,
+        turn.cost,
+        turn.requests,
+        turn.durationMs,
+        turn.cacheHitRate,
+        view.currency,
+        rateLine
+      ].join("|");
+      if (entry.signature === signature) return;
+      entry.signature = signature;
+      setText2(entry.totalNum, view.int(totals.total));
+      const showCost = view.showCost && turn.cost > 0;
+      if (entry.costGroup) entry.costGroup.hidden = !showCost;
+      setText2(entry.costEl, showCost ? view.money(turn.cost) : "");
+      if (entry.costBlock) {
+        entry.costBlock.hidden = !showCost;
+        if (showCost) {
+          setText2(entry.costMain, view.money(turn.cost));
+          const original = view.currency === "CNY" ? formatCost(turn.cost, view.locale) : "";
+          entry.costAlt.hidden = !original;
+          setText2(entry.costAlt, original ? `\u2248 ${original}` : "");
+        }
+      }
+      for (const key of TOKEN_KEYS) {
+        setText2(entry.cells[key], view.int(totals[key]));
+      }
+      const composition = tokenComposition(totals);
+      entry.bar.hidden = !composition.some((part) => part.value > 0);
+      for (const part of composition) {
+        const segment = entry.segments[part.key];
+        segment.hidden = part.share <= 0;
+        segment.style.width = `${(part.share * 100).toFixed(4)}%`;
+      }
+      const hit = turn.cacheHitRate !== null && Number.isFinite(turn.cacheHitRate) ? turn.cacheHitRate : null;
+      entry.hitCell.hidden = hit === null;
+      setText2(entry.hitValue, hit === null ? "\u2014" : view.percent(hit));
+      const parts = [];
+      parts.push(`${view.int(turn.requests)} ${copy.requests}`);
+      if (turn.durationMs > 0) parts.push(formatDuration(turn.durationMs));
+      setText2(entry.meta, parts.join(" \xB7 "));
+      const rateText = view.showCost && turn.cost > 0 ? rateLine : "";
+      entry.rate.hidden = !rateText;
+      setText2(entry.rate, rateText);
+      if (entry.reposition && entry.isOpen()) entry.reposition();
+    }
+    function bindTooltip2(entry, view) {
+      const { root, info, pop } = entry;
+      let open = false;
+      let pinned = false;
+      let showTimer;
+      let hideTimer;
+      let listening = false;
+      let onScroll = null;
+      let onResize = null;
+      let onOutside = null;
+      const bounds = () => {
+        const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+        const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+        let rect = null;
+        if (entry.scrollEl && entry.scrollEl.getBoundingClientRect) {
+          rect = entry.scrollEl.getBoundingClientRect();
+        }
+        return {
+          top: Math.max(0, rect ? rect.top : 0),
+          bottom: Math.min(viewportHeight, rect ? rect.bottom : viewportHeight),
+          left: Math.max(0, rect ? rect.left : 0),
+          right: Math.min(viewportWidth, rect ? rect.right : viewportWidth)
+        };
+      };
+      const position = () => {
+        if (!open || !root.isConnected) return;
+        const area2 = bounds();
+        if (area2.right - area2.left < 140 || area2.bottom - area2.top < 120) return;
+        pop.style.maxWidth = `${Math.max(160, area2.right - area2.left - 16)}px`;
+        pop.style.maxHeight = `${Math.max(140, area2.bottom - area2.top - 16)}px`;
+        const anchor = root.getBoundingClientRect();
+        const result = placeTooltip({
+          anchor: { top: anchor.top, bottom: anchor.bottom, left: anchor.left },
+          pop: { width: pop.offsetWidth, height: pop.offsetHeight },
+          bounds: area2,
+          gap: 8,
+          pad: 8
+        });
+        pop.style.left = `${Math.round(result.left - anchor.left)}px`;
+        pop.style.top = `${Math.round(result.top - anchor.top)}px`;
+        pop.dataset.placement = result.placement;
+      };
+      const listen = () => {
+        if (listening) return;
+        listening = true;
+        onScroll = () => position();
+        onResize = () => position();
+        window.addEventListener("scroll", onScroll, true);
+        window.addEventListener("resize", onResize);
+      };
+      const unlisten = () => {
+        if (!listening) return;
+        listening = false;
+        window.removeEventListener("scroll", onScroll, true);
+        window.removeEventListener("resize", onResize);
+        onScroll = null;
+        onResize = null;
+      };
+      const attachOutside = () => {
+        if (onOutside) return;
+        onOutside = (event) => {
+          if (root.contains(event.target)) return;
+          setPinned(false);
+          hide(0);
+        };
+        document.addEventListener("pointerdown", onOutside, true);
+        document.addEventListener("keydown", handleDocKey, true);
+      };
+      const detachOutside = () => {
+        if (!onOutside) return;
+        document.removeEventListener("pointerdown", onOutside, true);
+        document.removeEventListener("keydown", handleDocKey, true);
+        onOutside = null;
+      };
+      const handleDocKey = (event) => {
+        if (event.key !== "Escape" || !pinned) return;
+        event.stopPropagation();
+        setPinned(false);
+        hide(0);
+      };
+      const show = () => {
+        clearTimeout(showTimer);
+        clearTimeout(hideTimer);
+        if (!open) {
+          open = true;
+          updateFooter2(entry, entry.turn, view);
+          root.setAttribute("data-open", "true");
+          pop.setAttribute("data-open", "true");
+          pop.setAttribute("aria-hidden", "false");
+          info.setAttribute("aria-expanded", "true");
+          listen();
+        }
+        position();
+      };
+      const hide = (delay) => {
+        clearTimeout(showTimer);
+        clearTimeout(hideTimer);
+        hideTimer = setTimeout(() => {
+          if (pinned || !open) return;
+          open = false;
+          root.removeAttribute("data-open");
+          pop.removeAttribute("data-open");
+          pop.setAttribute("aria-hidden", "true");
+          info.setAttribute("aria-expanded", "false");
+          unlisten();
+        }, delay);
+      };
+      function setPinned(value) {
+        pinned = Boolean(value);
+        root.toggleAttribute("data-pinned", pinned);
+        info.setAttribute("aria-label", pinned ? view.copy.hideDetails : view.copy.showDetails);
+        if (pinned) {
+          show();
+          attachOutside();
+        } else {
+          detachOutside();
+          if (!root.matches(":hover") && !info.matches(":focus-visible")) hide(0);
+        }
+      }
+      const onEnter = () => {
+        if (pinned) return;
+        clearTimeout(showTimer);
+        clearTimeout(hideTimer);
+        showTimer = setTimeout(show, SHOW_DELAY_MS);
+      };
+      const onLeave = () => {
+        clearTimeout(showTimer);
+        if (!pinned && !info.matches(":focus-visible")) hide(HIDE_DELAY_MS);
+      };
+      const onClick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setPinned(!pinned);
+      };
+      const onFocus = () => show();
+      const onBlur = () => {
+        if (!pinned && !root.matches(":hover")) hide(0);
+      };
+      const onKeyDown = (event) => {
+        if (event.key !== "Escape" || !open) return;
+        event.stopPropagation();
+        setPinned(false);
+        hide(0);
+      };
+      const onRemove = () => {
+        pinned = false;
+        clearTimeout(showTimer);
+        clearTimeout(hideTimer);
+        unlisten();
+        detachOutside();
+      };
+      root.addEventListener("pointerenter", onEnter);
+      root.addEventListener("pointerleave", onLeave);
+      info.addEventListener("click", onClick);
+      info.addEventListener("focus", onFocus);
+      info.addEventListener("blur", onBlur);
+      root.addEventListener("keydown", onKeyDown);
+      entry.reposition = position;
+      entry.isOpen = () => open;
+      entry.close = () => {
+        setPinned(false);
+        hide(0);
+      };
+      entry.dispose = () => {
+        onRemove();
+        root.removeEventListener("pointerenter", onEnter);
+        root.removeEventListener("pointerleave", onLeave);
+        info.removeEventListener("click", onClick);
+        info.removeEventListener("focus", onFocus);
+        info.removeEventListener("blur", onBlur);
+        root.removeEventListener("keydown", onKeyDown);
+      };
+      return entry;
+    }
+    module2.exports = {
+      CSS: CSS2,
+      FOOTER_ATTR,
+      bindTooltip: bindTooltip2,
+      createFooter: createFooter2,
+      updateFooter: updateFooter2
     };
   }
 });
@@ -227,15 +1049,18 @@ var {
   cacheHitRate,
   clampNumber,
   finite,
-  formatCost,
-  formatDuration,
   formatMoney,
   normalizeCurrency,
   normalizeRefreshMode,
   sameTotals,
   smoothingAlpha
 } = require_core();
-var FOOTER_ATTR = "data-token-usage";
+var {
+  CSS,
+  bindTooltip,
+  createFooter,
+  updateFooter
+} = require_footer();
 var STYLE_ID = "opencode-token-usage-gui-style";
 var GUARD_KEY = "__OPENCODE_TOKEN_USAGE_GUI__";
 var DEFAULT_REFRESH_MS = 500;
@@ -271,7 +1096,11 @@ var COPY = {
     rate: "Exchange rate",
     rateManual: "manual",
     rateAuto: "auto",
-    rateFallback: "fallback"
+    rateFallback: "fallback",
+    breakdown: "Turn breakdown",
+    composition: "Token composition",
+    showDetails: "Show token breakdown",
+    hideDetails: "Hide token breakdown"
   },
   zh: {
     turn: "\u672C\u8F6E",
@@ -287,62 +1116,13 @@ var COPY = {
     rate: "\u6C47\u7387",
     rateManual: "\u624B\u52A8",
     rateAuto: "\u81EA\u52A8",
-    rateFallback: "\u515C\u5E95"
+    rateFallback: "\u515C\u5E95",
+    breakdown: "\u672C\u8F6E\u660E\u7EC6",
+    composition: "\u8BCD\u5143\u6784\u6210",
+    showDetails: "\u67E5\u770B\u7528\u91CF\u660E\u7EC6",
+    hideDetails: "\u6536\u8D77\u7528\u91CF\u660E\u7EC6"
   }
 };
-var CSS = `
-[${FOOTER_ATTR}] {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  column-gap: 6px;
-  row-gap: 2px;
-  width: 100%;
-  margin: 8px 0 2px;
-  padding: 2px 0 8px;
-  color: var(--v2-text-text-muted, #a3a3a3);
-  font-size: 12px;
-  line-height: 1.5;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.01em;
-  user-select: text;
-  -webkit-user-select: text;
-}
-[${FOOTER_ATTR}] .tu-label {
-  color: var(--v2-text-text-faint, #8a8a8a);
-  font-size: 11px;
-  letter-spacing: 0.02em;
-}
-[${FOOTER_ATTR}] .tu-item {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 3px;
-  white-space: nowrap;
-}
-[${FOOTER_ATTR}] .tu-key {
-  color: var(--v2-text-text-faint, #8a8a8a);
-  font-size: 11px;
-}
-[${FOOTER_ATTR}] .tu-val {
-  color: var(--v2-text-text-muted, #a3a3a3);
-}
-[${FOOTER_ATTR}] .tu-sep {
-  color: var(--v2-text-text-faint, #8a8a8a);
-  opacity: 0.45;
-  user-select: none;
-}
-[${FOOTER_ATTR}] .tu-total .tu-val {
-  color: var(--v2-text-text-base, #d4d4d4);
-  font-weight: 500;
-}
-[${FOOTER_ATTR}] .tu-cost {
-  color: var(--v2-text-text-base, #d4d4d4);
-  font-weight: 500;
-}
-[${FOOTER_ATTR}] [hidden] {
-  display: none !important;
-}
-`;
 function pickLocale(ctx) {
   try {
     const value = ctx.locale && typeof ctx.locale.locale === "function" ? ctx.locale.locale() : "";
@@ -422,55 +1202,6 @@ function setText(node, text) {
   }
   node.textContent = text;
 }
-function separator() {
-  const node = document.createElement("span");
-  node.className = "tu-sep";
-  node.setAttribute("aria-hidden", "true");
-  node.textContent = "\xB7";
-  return node;
-}
-function createFooter(turn, view) {
-  const root = document.createElement("div");
-  root.setAttribute(FOOTER_ATTR, "");
-  root.setAttribute("role", "note");
-  root.setAttribute("aria-live", "off");
-  const values = {};
-  const label = document.createElement("span");
-  label.className = "tu-label";
-  label.textContent = view.copy.turn;
-  root.append(label);
-  const item = (key, text, className) => {
-    root.append(separator());
-    const wrap = document.createElement("span");
-    wrap.className = className ? `tu-item ${className}` : "tu-item";
-    const name = document.createElement("span");
-    name.className = "tu-key";
-    name.textContent = text;
-    const value = document.createElement("span");
-    value.className = "tu-val";
-    wrap.append(name, value);
-    root.append(wrap);
-    values[key] = value;
-    return wrap;
-  };
-  item("input", view.copy.input);
-  item("output", view.copy.output);
-  if (!view.compact) {
-    if (view.detailed) item("reasoning", view.copy.reasoning);
-    item("cacheRead", view.copy.cacheRead);
-    if (view.detailed) item("cacheWrite", view.copy.cacheWrite);
-    item("cacheHit", view.copy.cacheHit);
-  }
-  item("total", view.copy.total, "tu-total");
-  let costEl = null;
-  if (view.showCost) {
-    root.append(separator());
-    costEl = document.createElement("span");
-    costEl.className = "tu-item tu-cost";
-    root.append(costEl);
-  }
-  return { root, values, costEl };
-}
 function paint(entry, view) {
   for (const key of METRICS) {
     const value = entry.values[key];
@@ -479,35 +1210,16 @@ function paint(entry, view) {
   const hit = cacheHitRate(entry.current);
   if (entry.values.cacheHit) {
     setText(entry.values.cacheHit, view.percent(hit));
-    entry.values.cacheHit.parentElement.hidden = hit === null;
+    entry.groups.cacheHit.hidden = hit === null;
   }
   if (entry.values.cacheWrite) {
-    entry.values.cacheWrite.parentElement.hidden = finite(entry.current.cacheWrite) <= 0;
-  }
-}
-function updateDetail(entry, turn, view) {
-  const copy = view.copy;
-  const original = formatCost(turn.cost, view.locale);
-  const shown = view.money(turn.cost);
-  const cost = view.showCost && turn.cost > 0 ? ` \xB7 ${shown}${view.currency === "CNY" ? ` (${original})` : ""}` : "";
-  const lines = [
-    `${copy.turn} ${view.int(turn.totals.total)} ${copy.tokens}${cost}`,
-    `${copy.input} ${view.int(turn.totals.input)} \xB7 ${copy.output} ${view.int(turn.totals.output)} \xB7 ${copy.reasoning} ${view.int(turn.totals.reasoning)}`,
-    `${copy.cacheRead} ${view.int(turn.totals.cacheRead)} \xB7 ${copy.cacheWrite} ${view.int(turn.totals.cacheWrite)} \xB7 ${copy.cacheHit} ${view.percent(turn.cacheHitRate)}`,
-    `${view.int(turn.requests)} ${copy.requests}${turn.durationMs > 0 ? ` \xB7 ${formatDuration(turn.durationMs)}` : ""}`
-  ];
-  const rateLine = view.rateLine();
-  if (rateLine) lines.push(rateLine);
-  entry.root.title = lines.join("\n");
-  if (entry.costEl) {
-    setText(entry.costEl, shown);
-    entry.costEl.hidden = turn.cost <= 0;
+    entry.groups.cacheWrite.hidden = finite(entry.current.cacheWrite) <= 0;
   }
 }
 function applyTurn(entry, turn, view, animate) {
   const changed = !sameTotals(entry.target, turn.totals);
   entry.turn = turn;
-  updateDetail(entry, turn, view);
+  updateFooter(entry, turn, view);
   if (!changed) return;
   const next = { ...turn.totals };
   if (!animate || !inViewport(entry.root) || next.total < entry.current.total) {
@@ -673,69 +1385,87 @@ module.exports = Plugin.define({
       frame = active ? requestAnimationFrame(tick) : void 0;
     };
     const sync = () => {
-      const session = ctx.sessions.current();
-      if (!session || !session.id) return;
-      const data = session.server && session.server.data;
-      const messagesApi = data && data.session && data.session.message;
-      if (!messagesApi || typeof messagesApi.list !== "function") return;
-      const messages = messagesApi.list(session.id);
-      if (!Array.isArray(messages) || messages.length === 0) return;
-      const info = data.session.get && data.session.get(session.id);
-      const turns = buildTurns(messages, info && info.revert && info.revert.messageID);
-      if (turns.size === 0) return;
-      const byMessage = /* @__PURE__ */ new Map();
-      for (const [turnId, turn] of turns) {
-        for (const messageId of turn.messageIds) byMessage.set(messageId, turnId);
-      }
-      const scroll = findScroll();
-      if (!scroll) return;
-      observe(scroll);
-      const rows = collectRows(scroll);
-      if (rows.length === 0) return;
-      const chosen = /* @__PURE__ */ new Map();
-      for (const row of rows) {
-        const id = row.getAttribute("data-message-id");
-        if (!id) continue;
-        const turnId = turns.has(id) ? id : byMessage.get(id);
-        if (!turnId) continue;
-        const turn = turns.get(turnId);
-        if (!turn || turn.totals.total <= 0) continue;
-        chosen.set(turnId, row);
-      }
       const seen = /* @__PURE__ */ new Set();
-      for (const [turnId, row] of chosen) {
-        const turn = turns.get(turnId);
-        const key = `${session.id}:${turnId}`;
-        seen.add(key);
-        let entry = state.get(key);
-        if (!entry) {
-          const footer = createFooter(turn, view);
-          entry = {
-            ...footer,
-            turn,
-            target: { ...turn.totals },
-            current: { ...turn.totals },
-            from: { ...turn.totals },
-            startedAt: 0,
-            targetEl: null
-          };
-          state.set(key, entry);
-          paint(entry, view);
-          updateDetail(entry, turn, view);
-        } else {
-          applyTurn(entry, turn, view, animate);
+      let sessionId = null;
+      let known = null;
+      try {
+        const session = ctx.sessions.current();
+        if (!session || !session.id) return;
+        sessionId = session.id;
+        const data = session.server && session.server.data;
+        const messagesApi = data && data.session && data.session.message;
+        if (!messagesApi || typeof messagesApi.list !== "function") return;
+        const messages = messagesApi.list(session.id);
+        if (!Array.isArray(messages) || messages.length === 0) return;
+        const info = data.session.get && data.session.get(session.id);
+        const turns = buildTurns(messages, info && info.revert && info.revert.messageID);
+        if (turns.size === 0) return;
+        const byMessage = /* @__PURE__ */ new Map();
+        known = new Set(turns.keys());
+        for (const [turnId, turn] of turns) {
+          for (const messageId of turn.messageIds) {
+            byMessage.set(messageId, turnId);
+            known.add(messageId);
+          }
         }
-        const target = contentTarget(row);
-        if (entry.targetEl !== target || !entry.root.isConnected || entry.root.parentElement !== target) {
-          target.appendChild(entry.root);
-          entry.targetEl = target;
+        const scroll = findScroll();
+        if (!scroll) return;
+        observe(scroll);
+        const rows = collectRows(scroll);
+        if (rows.length === 0) return;
+        const chosen = /* @__PURE__ */ new Map();
+        for (const row of rows) {
+          const id = row.getAttribute("data-message-id");
+          if (!id) continue;
+          const turnId = turns.has(id) ? id : byMessage.get(id);
+          if (!turnId) continue;
+          const turn = turns.get(turnId);
+          if (!turn || turn.totals.total <= 0 && turn.cost <= 0) continue;
+          chosen.set(turnId, row);
         }
-      }
-      for (const [key, entry] of state) {
-        if (seen.has(key)) continue;
-        if (!key.startsWith(`${session.id}:`) || !entry.root.isConnected) {
-          entry.root.remove();
+        for (const [turnId, row] of chosen) {
+          const turn = turns.get(turnId);
+          const key = `${session.id}:${turnId}`;
+          seen.add(key);
+          let entry = state.get(key);
+          if (!entry) {
+            entry = createFooter(turn, view);
+            entry.target = { ...turn.totals };
+            entry.current = { ...turn.totals };
+            entry.from = { ...turn.totals };
+            entry.startedAt = 0;
+            entry.scrollEl = scroll;
+            bindTooltip(entry, view);
+            state.set(key, entry);
+            paint(entry, view);
+          } else {
+            entry.scrollEl = scroll;
+            applyTurn(entry, turn, view, animate);
+          }
+          const target = contentTarget(row);
+          if (entry.targetEl !== target || !entry.root.isConnected || entry.root.parentElement !== target) {
+            target.appendChild(entry.root);
+            entry.targetEl = target;
+            if (entry.isOpen()) entry.reposition();
+          }
+        }
+      } finally {
+        for (const [key, entry] of state) {
+          if (seen.has(key)) continue;
+          let stale = true;
+          if (sessionId && entry.root.isConnected && key.startsWith(`${sessionId}:`)) {
+            if (!known) {
+              stale = false;
+            } else {
+              const owner = entry.targetEl && entry.targetEl.closest ? entry.targetEl.closest("[data-message-id]") : null;
+              const id = owner && owner.getAttribute("data-message-id");
+              stale = !(id && known.has(id));
+            }
+          }
+          if (!stale) continue;
           state.delete(key);
+          if (entry.dispose) entry.dispose();
+          entry.root.remove();
         }
       }
     };
@@ -760,7 +1490,9 @@ module.exports = Plugin.define({
       }
     };
     const scheduleSample = () => {
-      if (disposed) return;
+      if (sampleTimer) clearTimeout(sampleTimer);
+      sampleTimer = void 0;
+      if (disposed || document.hidden) return;
       sampleTimer = setTimeout(() => {
         if (disposed) return;
         refresh();
@@ -770,7 +1502,7 @@ module.exports = Plugin.define({
     const refreshDetails = () => {
       if (disposed) return;
       for (const entry of state.values()) {
-        if (entry.turn) updateDetail(entry, entry.turn, view);
+        if (entry.turn) updateFooter(entry, entry.turn, view);
       }
     };
     const loadRate = async () => {
@@ -822,7 +1554,13 @@ module.exports = Plugin.define({
       }
     };
     const onVisibilityChange = () => {
-      if (!document.hidden) refresh();
+      if (document.hidden) {
+        if (sampleTimer) clearTimeout(sampleTimer);
+        sampleTimer = void 0;
+        return;
+      }
+      refresh();
+      scheduleSample();
     };
     const cleanup = () => {
       disposed = true;
@@ -831,7 +1569,10 @@ module.exports = Plugin.define({
       if (frame !== void 0) cancelAnimationFrame(frame);
       if (observer) observer.disconnect();
       document.removeEventListener("visibilitychange", onVisibilityChange);
-      for (const entry of state.values()) entry.root.remove();
+      for (const entry of state.values()) {
+        if (entry.dispose) entry.dispose();
+        entry.root.remove();
+      }
       state.clear();
       if (styleNode) styleNode.remove();
       if (window[GUARD_KEY] && window[GUARD_KEY].cleanup === cleanup) delete window[GUARD_KEY];

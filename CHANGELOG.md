@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.3.0 — 2026-10-30
+
+- **A real breakdown card replaces the native `title` tooltip.** Hovering or focusing the footer now opens a
+  theme-aware card instead of the browser's delayed, unstyleable tooltip.
+- **A target you can actually hit.** The footer is a padded pill (about 30 px tall) with a dedicated info button
+  whose hit area extends past its glyph. The card stays open when the pointer moves onto it — an invisible 8 px
+  bridge spans the gap — so it does not vanish while you aim at it.
+- **Click to pin.** The info button pins the card; pinned text is selectable, and Escape, a second click, or a
+  click outside closes it. Keyboard users get the same flow through Tab / Enter / Space.
+- **Readable at a glance.** The card adds a composition bar, a six-cell metric grid (input, output, reasoning,
+  cache read, cache write, cache hit), request count, wall time, and the exchange-rate source. The visible footer
+  stays compact.
+- **Placement that behaves.** The card prefers to sit above the footer, flips below when the timeline has no room,
+  clamps horizontally, and repositions on scroll and resize.
+- **Theme-native.** Background, borders, elevation, text and overlay colors come from the desktop's own v2 tokens,
+  so light and dark mode both look native. `prefers-reduced-motion` is honored.
+- **Actually pauses when hidden.** The sample timer is now cleared while the window is hidden (the README already
+  promised this); it restarts and refreshes on visibility.
+- **No ghost footers.** Stale entries are pruned on every sync, so switching sessions, reverting a turn, or a row
+  the app removed no longer leaves a footer behind, while a transient re-render keeps the existing ones.
+- **Zero buckets no longer leave stray separators.** Hidden items now hide their leading separator too.
+- Cost-only turns (reported cost with zero tokens) now get a footer instead of being dropped.
+- 27 unit tests (was 18), including placement math and composition shares.
+- Refreshed the interactive mock and screenshot; added an in-page light/dark toggle.
+
 ## 0.2.2 — 2026-10-30
 
 - **Continuous mode (new default).** The sampler reads the store every 100 ms while the session is running and

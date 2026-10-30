@@ -17,7 +17,7 @@ A zero-config GUI plugin for **OpenCode Desktop**: per-turn tokens, cache hit ra
 
 ![OpenCode Desktop with a per-turn token footer](assets/screenshot-en.png)
 
-*Illustrative English mock of the footer and tooltip. Not a real session screenshot.*
+*Illustrative English mock of the footer and details card. Not a real session screenshot.*
 
 > OpenCode Desktop shows the latest request and the session total. It does not show what **this turn** cost.
 > This plugin adds the missing line.
@@ -28,14 +28,20 @@ A zero-config GUI plugin for **OpenCode Desktop**: per-turn tokens, cache hit ra
 This turn · Input 15,733 · Output 6,250 · Cache read 10,300,544 · Cache hit 99.8% · Total 10,332,638 · ¥0.288
 ```
 
-Hover the line for the full breakdown:
+Hover the line — or focus its info button — for a readable breakdown:
 
 ```text
-This turn 10,332,638 tokens · ¥0.288 ($0.0431)
-Input 15,733 · Output 6,250 · Reasoning 10,111
-Cache read 10,300,544 · Cache write 0 · Cache hit 99.8%
-21 model requests · 2m 15s
+Turn breakdown · 10,332,638 tokens · ¥0.288 (≈ $0.0431)
+[■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■] 99.7% cache read
+Input 15,733      Output 6,250
+Reasoning 10,111  Cache read 10,300,544
+Cache write 0     Cache hit 99.8%
+21 model requests · 2m 15s · Exchange rate 6.68 · manual
 ```
+
+Click the info button to pin the card while you read or copy it. The preview stays open when you move onto it — an
+invisible 8 px bridge covers the gap — so there is nothing to chase; the pinned card closes with Escape or a click
+outside.
 
 ## Why not just use the built-in context panel?
 
@@ -58,6 +64,15 @@ numbers that actually change the bill.
 ## Features
 
 - **Per-turn, not per-message.** One footer per turn, aggregating every assistant request and tool loop.
+- **A details card that is actually readable.** Hover or focus the footer for a theme-aware card with a token
+  composition bar, a six-cell metric grid, request count, wall time, and the exchange-rate source. The card stays
+  open while your pointer is over it (an invisible bridge covers the gap) and can be pinned with the info button
+  for persistent reading and copying. It flips above/below and clamps to the timeline, and repositions on scroll
+  and resize.
+- **A footer you can hit.** The visible line is a padded pill with a dedicated info button whose hit area extends
+  past the glyph; no need to land on a single 12 px line.
+- **Keyboard accessible.** Tab to the info button, press Enter or Space to pin, Escape or an outside click to close.
+  `prefers-reduced-motion` disables the card transition.
 - **Live count-up.** Continuous mode samples the store at 100 ms while running and follows the target with a
   60 Hz first-order lag; a new sample changes the target without restarting the animation, so the counter reads
   as one continuous motion. An `interval` mode keeps the old discrete refresh + tween behavior. Respects
@@ -65,17 +80,19 @@ numbers that actually change the bill.
 - **Cache-aware.** Shows cache reads and the cache hit rate — the metric that explains most of the cost difference
   on DeepSeek and Anthropic models.
 - **RMB by default.** Converts the app's USD cost with a manual or daily-cached rate; the original USD amount stays
-  in the tooltip. `"currency": "USD"` switches back, `"auto"` follows the UI language.
+  in the card. `"currency": "USD"` switches back, `"auto"` follows the UI language.
 - **Revert-aware.** Messages hidden by an undo/revert boundary are excluded from totals.
+- **Stale-proof.** Stale footers are pruned on every sync, so a session switch, a revert, or a row the app removed
+  cannot leave a ghost line behind.
 - **Bilingual.** Follows the app locale: 中文 or English.
 - **Compact or detailed.** Default shows the decision-making numbers; `detailed` adds reasoning tokens and cache
-  writes to the visible line.
+  writes to the visible line. The card always shows the full breakdown.
 - **Zero runtime dependencies.** One built CJS file. No telemetry, no API keys, and no network requests unless you
   explicitly opt into `usdToCny: "auto"`.
 - **Safe failure.** If the app's internal DOM changes, the plugin logs one warning and stays quiet instead of
   breaking the timeline.
-- **Fast.** Aggregating 2,000 messages takes about 3 ms in the test suite; the UI refresh is a 500 ms timer plus a
-  debounced `MutationObserver`.
+- **Fast.** Aggregating 2,000 messages takes about 3 ms in the test suite; the sampler runs at 100 ms while a
+  session is running (1000 ms idle), and the card only writes DOM when its data changes.
 
 ## Install
 
@@ -188,7 +205,7 @@ A local directory works the same way:
 - `usdToCny: 6.68` is a manual rate. It is deterministic and makes **no network request**.
 - `usdToCny: "auto"` fetches the daily USD→CNY rate from `open.er-api.com`, caches it for 24 hours, and falls back to the last cached rate or the manual `6.68` when offline. Only this opt-in mode uses the network.
 
-The tooltip always tells you which rate was used:
+The details card always tells you which rate was used:
 
 ```text
 Exchange rate 6.68 · manual
@@ -232,7 +249,7 @@ The timer pauses while the window is hidden and refreshes immediately when it be
 | `compact: true` | input · output · total · cost |
 | `detailed: true` | input · output · reasoning · cache read · cache write · cache hit · total · cost |
 
-The tooltip always shows the full breakdown, including request count and wall time.
+The details card always shows the full breakdown, including the composition bar, request count and wall time.
 
 ## What the numbers mean
 
@@ -272,13 +289,15 @@ user message
 2. It groups assistant messages by the preceding user/synthetic message and sums `tokens` and `cost`.
 3. It finds the rendered assistant content container (`[data-slot="session-turn-assistant-content"]`) and appends
    a footer node.
-4. A 500 ms interval keeps values fresh; a `MutationObserver` re-attaches the footer when the app re-renders the
-   timeline; `requestAnimationFrame` animates changes.
+4. A 100 ms sampler (1000 ms when idle) keeps values fresh; a `MutationObserver` re-attaches the footer when the
+   app re-renders the timeline; `requestAnimationFrame` animates changes.
+5. Hovering the footer opens a card built from the same DOM node. It prefers the space above the line, flips below
+   when needed, and is clamped to the timeline viewport. The timer pauses while the window is hidden.
 
 There is no official message-footer slot in the GUI plugin API, so the last step is DOM injection. That is the
 intentionally fragile part: if a future OpenCode release renames the slot, the footer disappears (the plugin logs
-one warning) rather than corrupting the timeline. The selector and aggregation logic are isolated in
-`src/gui.cjs` and `src/core.cjs`, so adapting is usually a one-line change.
+one warning) rather than corrupting the timeline. The selector, footer, placement and aggregation logic are isolated in
+`src/gui.cjs`, `src/footer.cjs`, `src/placement.cjs` and `src/core.cjs`, so adapting is usually a one-line change.
 
 ## Compatibility
 
@@ -307,10 +326,14 @@ A turn can contain many assistant requests and tool loops. Per-message numbers l
 Use `detailed` if you want more metrics on the visible line.
 
 **Can I see reasoning tokens?**
-Yes: set `detailed: true`, or hover the footer. Reasoning is always in the tooltip.
+Yes: set `detailed: true`, or open the details card. Reasoning is always in the card.
 
 **Can I use USD instead of RMB?**
-Yes: set `"currency": "USD"`. The tooltip still shows the other amount where relevant.
+Yes: set `"currency": "USD"`. The card still shows the original USD amount when CNY is selected.
+
+**How do I keep the card open?**
+Click the small info button at the end of the footer. The pinned card is selectable, so you can copy numbers; click
+the button again, press Escape, or click outside to close it.
 
 **Why is the cost zero?**
 The provider did not report a cost for that request. Free models and some local providers do not report one.
@@ -321,12 +344,13 @@ OpenCode version and a screenshot.
 
 **How is the exchange rate determined?**
 By default it is the manual `usdToCny` number (`6.68`). With `"usdToCny": "auto"` it fetches the daily rate, caches
-it for 24 hours, and falls back to the last cache or `6.68`. The tooltip shows the rate, its source, and the date
-when it was automatic.
+it for 24 hours, and falls back to the last cache or `6.68`. The details card shows the rate, its source, and the
+date when it was automatic.
 
 **Can I change how often the footer refreshes?**
-Yes: `refreshMs` (200–5000, default 500) and `tweenMs` (0–2000, default 550). The timer pauses while the window is
-hidden.
+Yes: `sampleMs` (50–1000, default 100) controls continuous sampling and `smoothMs` (50–2000, default 250) controls
+the follow speed; interval mode uses `refreshMs` (200–5000, default 500) and `tweenMs` (0–2000, default 550). The
+timer pauses while the window is hidden.
 
 **Does it work in the TUI?**
 No. The TUI has `debug.turn_tokens`; this plugin is for the desktop GUI.
@@ -334,7 +358,7 @@ No. The TUI has `debug.turn_tokens`; this plugin is for the desktop GUI.
 ## Roadmap
 
 - Per-message mode for people who want a footer under every assistant message.
-- Context usage percentage in the tooltip.
+- Context usage percentage in the details card.
 - CSV/JSON export of turn usage.
 - Provider-specific price tables instead of a single USD→CNY rate.
 - A small settings panel instead of JSON options.
@@ -355,10 +379,14 @@ Layout:
 
 ```text
 src/core.cjs              pure aggregation and formatting
-src/gui.cjs               plugin lifecycle, DOM, animation
+src/footer.cjs            footer DOM, details card and interactions
+src/placement.cjs         DOM-free card placement math
+src/gui.cjs               plugin lifecycle, DOM discovery, animation
 dist/gui-experimental.cjs built single-file CJS entry (committed)
-test/core.test.cjs        unit tests
+test/core.test.cjs        aggregation and formatter tests
+test/placement.test.cjs   card placement edge cases
 scripts/build.mjs         esbuild bundle
+assets/mock.html          interactive illustrative mock
 ```
 
 For local development, copy `dist/gui-experimental.cjs` into your plugin directory after each build, or point the

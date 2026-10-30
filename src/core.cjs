@@ -21,6 +21,9 @@ const METRICS = Object.freeze([
   "total",
 ])
 
+/** The five token buckets that make up the total, in display order. */
+const TOKEN_KEYS = Object.freeze(["input", "output", "reasoning", "cacheRead", "cacheWrite"])
+
 function finite(value) {
   const number = Number(value)
   return Number.isFinite(number) ? number : 0
@@ -111,6 +114,22 @@ function cacheHitRate(totals) {
   const prompt = finite(totals && totals.input) + finite(totals && totals.cacheRead) + finite(totals && totals.cacheWrite)
   if (prompt <= 0) return null
   return (finite(totals.cacheRead) / prompt) * 100
+}
+
+/**
+ * Split the turn total into the five buckets used by the composition bar.
+ * Shares always add up to 1 when the total is positive, even if the caller's
+ * buckets do not (for example a hand-built object in a test).
+ */
+function tokenComposition(totals) {
+  const values = TOKEN_KEYS.map((key) => Math.max(0, finite(totals && totals[key])))
+  const sum = values.reduce((total, value) => total + value, 0)
+  const denominator = sum > 0 ? sum : Math.max(0, finite(totals && totals.total))
+  return TOKEN_KEYS.map((key, index) => ({
+    key,
+    value: values[index],
+    share: denominator > 0 ? values[index] / denominator : 0,
+  }))
 }
 
 function emptyTurn(id) {
@@ -251,6 +270,7 @@ function formatDuration(milliseconds) {
 
 module.exports = {
   METRICS,
+  TOKEN_KEYS,
   addUsage,
   approachValue,
   buildTurns,
@@ -267,6 +287,7 @@ module.exports = {
   normalizeRefreshMode,
   sameTotals,
   smoothingAlpha,
+  tokenComposition,
   tokenUsage,
   visibleMessages,
 }

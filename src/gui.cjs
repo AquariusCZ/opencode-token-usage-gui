@@ -8,16 +8,19 @@ const {
   cacheHitRate,
   clampNumber,
   finite,
-  formatCost,
-  formatDuration,
   formatMoney,
   normalizeCurrency,
   normalizeRefreshMode,
   sameTotals,
   smoothingAlpha,
 } = require("./core.cjs")
+const {
+  CSS,
+  bindTooltip,
+  createFooter,
+  updateFooter,
+} = require("./footer.cjs")
 
-const FOOTER_ATTR = "data-token-usage"
 const STYLE_ID = "opencode-token-usage-gui-style"
 const GUARD_KEY = "__OPENCODE_TOKEN_USAGE_GUI__"
 const DEFAULT_REFRESH_MS = 500
@@ -55,6 +58,10 @@ const COPY = {
     rateManual: "manual",
     rateAuto: "auto",
     rateFallback: "fallback",
+    breakdown: "Turn breakdown",
+    composition: "Token composition",
+    showDetails: "Show token breakdown",
+    hideDetails: "Hide token breakdown",
   },
   zh: {
     turn: "本轮",
@@ -71,62 +78,12 @@ const COPY = {
     rateManual: "手动",
     rateAuto: "自动",
     rateFallback: "兜底",
+    breakdown: "本轮明细",
+    composition: "词元构成",
+    showDetails: "查看用量明细",
+    hideDetails: "收起用量明细",
   },
 }
-
-const CSS = `
-[${FOOTER_ATTR}] {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  column-gap: 6px;
-  row-gap: 2px;
-  width: 100%;
-  margin: 8px 0 2px;
-  padding: 2px 0 8px;
-  color: var(--v2-text-text-muted, #a3a3a3);
-  font-size: 12px;
-  line-height: 1.5;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.01em;
-  user-select: text;
-  -webkit-user-select: text;
-}
-[${FOOTER_ATTR}] .tu-label {
-  color: var(--v2-text-text-faint, #8a8a8a);
-  font-size: 11px;
-  letter-spacing: 0.02em;
-}
-[${FOOTER_ATTR}] .tu-item {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 3px;
-  white-space: nowrap;
-}
-[${FOOTER_ATTR}] .tu-key {
-  color: var(--v2-text-text-faint, #8a8a8a);
-  font-size: 11px;
-}
-[${FOOTER_ATTR}] .tu-val {
-  color: var(--v2-text-text-muted, #a3a3a3);
-}
-[${FOOTER_ATTR}] .tu-sep {
-  color: var(--v2-text-text-faint, #8a8a8a);
-  opacity: 0.45;
-  user-select: none;
-}
-[${FOOTER_ATTR}] .tu-total .tu-val {
-  color: var(--v2-text-text-base, #d4d4d4);
-  font-weight: 500;
-}
-[${FOOTER_ATTR}] .tu-cost {
-  color: var(--v2-text-text-base, #d4d4d4);
-  font-weight: 500;
-}
-[${FOOTER_ATTR}] [hidden] {
-  display: none !important;
-}
-`
 
 function pickLocale(ctx) {
   try {
@@ -227,64 +184,6 @@ function setText(node, text) {
   node.textContent = text
 }
 
-function separator() {
-  const node = document.createElement("span")
-  node.className = "tu-sep"
-  node.setAttribute("aria-hidden", "true")
-  node.textContent = "·"
-  return node
-}
-
-function createFooter(turn, view) {
-  const root = document.createElement("div")
-  root.setAttribute(FOOTER_ATTR, "")
-  root.setAttribute("role", "note")
-  root.setAttribute("aria-live", "off")
-
-  const values = {}
-  const label = document.createElement("span")
-  label.className = "tu-label"
-  label.textContent = view.copy.turn
-  root.append(label)
-
-  const item = (key, text, className) => {
-    root.append(separator())
-    const wrap = document.createElement("span")
-    wrap.className = className ? `tu-item ${className}` : "tu-item"
-    const name = document.createElement("span")
-    name.className = "tu-key"
-    name.textContent = text
-    const value = document.createElement("span")
-    value.className = "tu-val"
-    wrap.append(name, value)
-    root.append(wrap)
-    values[key] = value
-    return wrap
-  }
-
-  item("input", view.copy.input)
-  item("output", view.copy.output)
-
-  if (!view.compact) {
-    if (view.detailed) item("reasoning", view.copy.reasoning)
-    item("cacheRead", view.copy.cacheRead)
-    if (view.detailed) item("cacheWrite", view.copy.cacheWrite)
-    item("cacheHit", view.copy.cacheHit)
-  }
-
-  item("total", view.copy.total, "tu-total")
-
-  let costEl = null
-  if (view.showCost) {
-    root.append(separator())
-    costEl = document.createElement("span")
-    costEl.className = "tu-item tu-cost"
-    root.append(costEl)
-  }
-
-  return { root, values, costEl }
-}
-
 function paint(entry, view) {
   for (const key of METRICS) {
     const value = entry.values[key]
@@ -294,41 +193,17 @@ function paint(entry, view) {
   const hit = cacheHitRate(entry.current)
   if (entry.values.cacheHit) {
     setText(entry.values.cacheHit, view.percent(hit))
-    entry.values.cacheHit.parentElement.hidden = hit === null
+    entry.groups.cacheHit.hidden = hit === null
   }
   if (entry.values.cacheWrite) {
-    entry.values.cacheWrite.parentElement.hidden = finite(entry.current.cacheWrite) <= 0
-  }
-}
-
-function updateDetail(entry, turn, view) {
-  const copy = view.copy
-  const original = formatCost(turn.cost, view.locale)
-  const shown = view.money(turn.cost)
-  const cost =
-    view.showCost && turn.cost > 0
-      ? ` · ${shown}${view.currency === "CNY" ? ` (${original})` : ""}`
-      : ""
-  const lines = [
-    `${copy.turn} ${view.int(turn.totals.total)} ${copy.tokens}${cost}`,
-    `${copy.input} ${view.int(turn.totals.input)} · ${copy.output} ${view.int(turn.totals.output)} · ${copy.reasoning} ${view.int(turn.totals.reasoning)}`,
-    `${copy.cacheRead} ${view.int(turn.totals.cacheRead)} · ${copy.cacheWrite} ${view.int(turn.totals.cacheWrite)} · ${copy.cacheHit} ${view.percent(turn.cacheHitRate)}`,
-    `${view.int(turn.requests)} ${copy.requests}${turn.durationMs > 0 ? ` · ${formatDuration(turn.durationMs)}` : ""}`,
-  ]
-  const rateLine = view.rateLine()
-  if (rateLine) lines.push(rateLine)
-  entry.root.title = lines.join("\n")
-
-  if (entry.costEl) {
-    setText(entry.costEl, shown)
-    entry.costEl.hidden = turn.cost <= 0
+    entry.groups.cacheWrite.hidden = finite(entry.current.cacheWrite) <= 0
   }
 }
 
 function applyTurn(entry, turn, view, animate) {
   const changed = !sameTotals(entry.target, turn.totals)
   entry.turn = turn
-  updateDetail(entry, turn, view)
+  updateFooter(entry, turn, view)
   if (!changed) return
 
   const next = { ...turn.totals }
@@ -520,84 +395,107 @@ module.exports = Plugin.define({
     }
 
     const sync = () => {
-      const session = ctx.sessions.current()
-      if (!session || !session.id) return
-
-      const data = session.server && session.server.data
-      const messagesApi = data && data.session && data.session.message
-      if (!messagesApi || typeof messagesApi.list !== "function") return
-
-      const messages = messagesApi.list(session.id)
-      if (!Array.isArray(messages) || messages.length === 0) return
-
-      const info = data.session.get && data.session.get(session.id)
-      const turns = buildTurns(messages, info && info.revert && info.revert.messageID)
-      if (turns.size === 0) return
-
-      const byMessage = new Map()
-      for (const [turnId, turn] of turns) {
-        for (const messageId of turn.messageIds) byMessage.set(messageId, turnId)
-      }
-
-      const scroll = findScroll()
-      if (!scroll) return
-      observe(scroll)
-
-      const rows = collectRows(scroll)
-      if (rows.length === 0) return
-
-      const chosen = new Map()
-      for (const row of rows) {
-        const id = row.getAttribute("data-message-id")
-        if (!id) continue
-        const turnId = turns.has(id) ? id : byMessage.get(id)
-        if (!turnId) continue
-        const turn = turns.get(turnId)
-        if (!turn || turn.totals.total <= 0) continue
-        chosen.set(turnId, row)
-      }
-
       const seen = new Set()
-      for (const [turnId, row] of chosen) {
-        const turn = turns.get(turnId)
-        const key = `${session.id}:${turnId}`
-        seen.add(key)
+      let sessionId = null
+      let known = null
+      try {
+        const session = ctx.sessions.current()
+        if (!session || !session.id) return
+        sessionId = session.id
 
-        let entry = state.get(key)
-        if (!entry) {
-          const footer = createFooter(turn, view)
-          entry = {
-            ...footer,
-            turn,
-            target: { ...turn.totals },
-            current: { ...turn.totals },
-            from: { ...turn.totals },
-            startedAt: 0,
-            targetEl: null,
+        const data = session.server && session.server.data
+        const messagesApi = data && data.session && data.session.message
+        if (!messagesApi || typeof messagesApi.list !== "function") return
+
+        const messages = messagesApi.list(session.id)
+        if (!Array.isArray(messages) || messages.length === 0) return
+
+        const info = data.session.get && data.session.get(session.id)
+        const turns = buildTurns(messages, info && info.revert && info.revert.messageID)
+        if (turns.size === 0) return
+
+        const byMessage = new Map()
+        known = new Set(turns.keys())
+        for (const [turnId, turn] of turns) {
+          for (const messageId of turn.messageIds) {
+            byMessage.set(messageId, turnId)
+            known.add(messageId)
           }
-          state.set(key, entry)
-          paint(entry, view)
-          updateDetail(entry, turn, view)
-        } else {
-          applyTurn(entry, turn, view, animate)
         }
 
-        const target = contentTarget(row)
-        if (
-          entry.targetEl !== target ||
-          !entry.root.isConnected ||
-          entry.root.parentElement !== target
-        ) {
-          target.appendChild(entry.root)
-          entry.targetEl = target
-        }
-      }
+        const scroll = findScroll()
+        if (!scroll) return
+        observe(scroll)
 
-      for (const [key, entry] of state) {
-        if (seen.has(key)) continue
-        if (!key.startsWith(`${session.id}:`) || !entry.root.isConnected) {
-          entry.root.remove()
+        const rows = collectRows(scroll)
+        if (rows.length === 0) return
+
+        const chosen = new Map()
+        for (const row of rows) {
+          const id = row.getAttribute("data-message-id")
+          if (!id) continue
+          const turnId = turns.has(id) ? id : byMessage.get(id)
+          if (!turnId) continue
+          const turn = turns.get(turnId)
+          if (!turn || (turn.totals.total <= 0 && turn.cost <= 0)) continue
+          chosen.set(turnId, row)
+        }
+
+        for (const [turnId, row] of chosen) {
+          const turn = turns.get(turnId)
+          const key = `${session.id}:${turnId}`
+          seen.add(key)
+
+          let entry = state.get(key)
+          if (!entry) {
+            entry = createFooter(turn, view)
+            entry.target = { ...turn.totals }
+            entry.current = { ...turn.totals }
+            entry.from = { ...turn.totals }
+            entry.startedAt = 0
+            entry.scrollEl = scroll
+            bindTooltip(entry, view)
+            state.set(key, entry)
+            paint(entry, view)
+          } else {
+            entry.scrollEl = scroll
+            applyTurn(entry, turn, view, animate)
+          }
+
+          const target = contentTarget(row)
+          if (
+            entry.targetEl !== target ||
+            !entry.root.isConnected ||
+            entry.root.parentElement !== target
+          ) {
+            target.appendChild(entry.root)
+            entry.targetEl = target
+            if (entry.isOpen()) entry.reposition()
+          }
+        }
+      } finally {
+        // Drop entries that no longer belong here. Same-session footers stay
+        // attached through a transient re-render, but a session switch, a
+        // reverted turn or a detached row removes them.
+        for (const [key, entry] of state) {
+          if (seen.has(key)) continue
+          let stale = true
+          if (sessionId && entry.root.isConnected && key.startsWith(`${sessionId}:`)) {
+            if (!known) {
+              stale = false
+            } else {
+              const owner =
+                entry.targetEl && entry.targetEl.closest
+                  ? entry.targetEl.closest("[data-message-id]")
+                  : null
+              const id = owner && owner.getAttribute("data-message-id")
+              stale = !(id && known.has(id))
+            }
+          }
+          if (!stale) continue
           state.delete(key)
+          if (entry.dispose) entry.dispose()
+          entry.root.remove()
         }
       }
     }
@@ -627,7 +525,9 @@ module.exports = Plugin.define({
     }
 
     const scheduleSample = () => {
-      if (disposed) return
+      if (sampleTimer) clearTimeout(sampleTimer)
+      sampleTimer = undefined
+      if (disposed || document.hidden) return
       sampleTimer = setTimeout(() => {
         if (disposed) return
         refresh()
@@ -638,7 +538,7 @@ module.exports = Plugin.define({
     const refreshDetails = () => {
       if (disposed) return
       for (const entry of state.values()) {
-        if (entry.turn) updateDetail(entry, entry.turn, view)
+        if (entry.turn) updateFooter(entry, entry.turn, view)
       }
     }
 
@@ -696,7 +596,13 @@ module.exports = Plugin.define({
     }
 
     const onVisibilityChange = () => {
-      if (!document.hidden) refresh()
+      if (document.hidden) {
+        if (sampleTimer) clearTimeout(sampleTimer)
+        sampleTimer = undefined
+        return
+      }
+      refresh()
+      scheduleSample()
     }
 
     const cleanup = () => {
@@ -706,7 +612,10 @@ module.exports = Plugin.define({
       if (frame !== undefined) cancelAnimationFrame(frame)
       if (observer) observer.disconnect()
       document.removeEventListener("visibilitychange", onVisibilityChange)
-      for (const entry of state.values()) entry.root.remove()
+      for (const entry of state.values()) {
+        if (entry.dispose) entry.dispose()
+        entry.root.remove()
+      }
       state.clear()
       if (styleNode) styleNode.remove()
       if (window[GUARD_KEY] && window[GUARD_KEY].cleanup === cleanup) delete window[GUARD_KEY]

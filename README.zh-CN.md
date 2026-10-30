@@ -28,14 +28,19 @@
 本轮  输入 15,733 · 输出 6,250 · 缓存读 10,300,544 · 缓存命中 99.8% · 合计 10,332,638 · ¥0.288
 ```
 
-鼠标悬停可以看到完整明细：
+鼠标悬停（或把焦点移到行尾的 ⓘ 按钮）可以看到一张可读性更好的明细卡片：
 
 ```text
-本轮 10,332,638 词元 · ¥0.288 ($0.0431)
-输入 15,733 · 输出 6,250 · 推理 10,111
-缓存读 10,300,544 · 缓存写 0 · 缓存命中 99.8%
-21 次模型请求 · 2m 15s
+本轮明细 · 10,332,638 词元 · ¥0.288（≈ $0.0431）
+[■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■] 99.7% 缓存读
+输入 15,733      输出 6,250
+推理 10,111      缓存读 10,300,544
+缓存写 0         缓存命中 99.8%
+21 次模型请求 · 2m 15s · 汇率 6.68 · 手动
 ```
+
+点击 ⓘ 按钮可以把卡片钉住，方便阅读或复制；未钉住时卡片也能直接悬停——卡片和 footer 之间有一条
+不可见的 8px 悬停桥，鼠标移上去不会消失；移开自动收起，钉住后按 Esc 或点击卡片外关闭。
 
 ## 为什么不直接用右上角的上下文面板？
 
@@ -56,15 +61,22 @@
 ## 功能
 
 - **按轮统计，不是按单条消息。** 一轮一个 footer，汇总所有 assistant 请求和工具循环。
+- **一张真正可读的明细卡。** 悬停或聚焦 footer，弹出一张跟随应用主题的卡片：词元构成条、六格指标、
+  请求次数、耗时和汇率来源。未钉住时卡片也能直接悬停（中间有看不见的 8px 悬停桥），点 ⓘ 可钉住卡片
+  持续阅读/复制。卡片优先向上弹，空间不足时翻到下方，并自动夹在时间线可视区域内，滚动/缩放时跟随。
+- **更容易对准。** 可见行本身是一块带内边距的胶囊，行尾有独立 ⓘ 按钮，点击热区比图标更大，不用再
+  精确地停在一条 12px 的细线上。
+- **键盘可用。** Tab 到 ⓘ，Enter / Space 钉住，Esc 或点击外部关闭；`prefers-reduced-motion` 下关闭过渡动画。
 - **实时计数。** 默认 `continuous` 模式：会话运行时每 100ms 采样，60Hz 一阶滞后持续追目标，新采样只改目标、不重置动画，所以从第一个 token 到最终合计是一段连续运动；`interval` 模式保留原来的离散刷新 + tween。尊重 `prefers-reduced-motion`。
 - **缓存感知。** 显示缓存读和缓存命中率——DeepSeek / Anthropic 的费用差异主要在这里。
-- **默认人民币。** 支持手动汇率或每日缓存汇率，原始美元放在 tooltip；`"currency": "USD"` 切回美元，`"auto"` 跟随界面语言。
+- **默认人民币。** 支持手动汇率或每日缓存汇率，原始美元放在明细卡；`"currency": "USD"` 切回美元，`"auto"` 跟随界面语言。
 - **撤销感知。** 被 revert / undo 边界隐藏的消息不会计入。
+- **不留幽灵 footer。** 每次采样都会清理已失效的条目，切换会话、revert 或行被应用移除都不会留下旧数据；短暂重渲染时保留已有 footer，避免闪烁。
 - **中英双语。** 跟随应用语言自动切换。
-- **紧凑 / 详细。** 默认只显示决策相关的数；`detailed` 会把推理 token 和缓存写也放到可见行。
+- **紧凑 / 详细。** 默认只显示决策相关的数；`detailed` 会把推理 token 和缓存写也放到可见行；明细卡始终显示完整拆分。
 - **零运行时依赖。** 一个构建好的 CJS 文件；默认不联网、没有遥测、不读 API Key（只有手动开启 `usdToCny: "auto"` 才会每天请求一次汇率）。
 - **安静失败。** OpenCode 更新导致内部 DOM 变化时，插件只打印一次警告，不会破坏时间线。
-- **快。** 2,000 条消息的聚合在测试里约 3ms；continuous 模式 100ms 采样 + 60Hz 滤波，interval 模式用 `refreshMs` 定时器，另有防抖 `MutationObserver`。
+- **快。** 2,000 条消息的聚合在测试里约 3ms；运行时 100ms 采样（空闲 1000ms），卡片只在数据变化时写 DOM。
 
 ## 安装
 
@@ -176,7 +188,7 @@ opencode plugin remove opencode-token-usage-gui
 - `usdToCny: 6.68` 是手动汇率，**不联网**，结果确定。
 - `usdToCny: "auto"` 每天从 `open.er-api.com` 拉一次 USD→CNY，缓存 24 小时；失败时用上次缓存或 `6.68` 兜底。只有这个显式选项会联网。
 
-tooltip 会明确告诉你用的是哪种汇率：
+明细卡会明确告诉你用的是哪种汇率：
 
 ```text
 汇率 6.68 · 手动
@@ -216,7 +228,7 @@ tooltip 会明确告诉你用的是哪种汇率：
 | `compact: true` | 输入 · 输出 · 合计 · 费用 |
 | `detailed: true` | 输入 · 输出 · 推理 · 缓存读 · 缓存写 · 缓存命中 · 合计 · 费用 |
 
-tooltip 永远显示完整明细，包括请求次数和耗时。
+明细卡永远显示完整拆分，包括词元构成条、请求次数和耗时。
 
 ## 数字口径
 
@@ -252,11 +264,12 @@ user message
 1. 从应用的客户端 store 读取当前会话的消息列表；
 2. 按前面的 user/synthetic 消息把 assistant 消息分组，累加 `tokens` 和 `cost`；
 3. 找到渲染出来的 assistant 内容容器（`[data-slot="session-turn-assistant-content"]`），把 footer 节点挂进去；
-4. 500ms 定时刷新；`MutationObserver` 在应用重渲染时把 footer 挂回去；`requestAnimationFrame` 做数字动画。
+4. 100ms 采样（空闲 1000ms）保持数据新鲜；`MutationObserver` 在应用重渲染时把 footer 挂回去；`requestAnimationFrame` 做数字动画；
+5. 悬停 footer 时用同一个节点弹出明细卡：优先向上，空间不够翻到下方，并夹在时间线可视区域内；窗口隐藏时暂停采样。
 
 GUI 插件 API 目前没有官方的「消息底部插槽」，所以最后一步是 DOM 注入。这是整个插件最脆的地方：未来
 OpenCode 如果改了 slot 名，footer 会消失（插件只打印一次警告），不会污染时间线。选择器和聚合逻辑分别隔离在
-`src/gui.cjs` 和 `src/core.cjs`，适配通常只需要改一行选择器。
+`src/gui.cjs`、`src/footer.cjs`、`src/placement.cjs` 和 `src/core.cjs`，适配通常只需要改一行选择器。
 
 ## 兼容性
 
@@ -283,10 +296,13 @@ OpenCode 如果改了 slot 名，footer 会消失（插件只打印一次警告�
 一轮里可能有很多 assistant 请求和工具循环；按单条消息显示会漏掉大部分消耗。想要更多指标可以开 `detailed`。
 
 **能看到推理 token 吗？**
-可以：`detailed: true`，或者直接把鼠标悬停在 footer 上。推理 token 永远在 tooltip 里。
+可以：`detailed: true`，或者直接打开明细卡。推理 token 永远在卡片里。
 
 **能用美元吗？**
 可以：`"currency": "USD"`。
+
+**怎么让卡片一直开着？**
+点 footer 行尾的 ⓘ 按钮钉住。钉住后可以直接选中文字复制；再点一次、按 Esc 或点卡片外关闭。
 
 **为什么费用是 0？**
 该请求没有上报 cost。免费模型和部分本地 provider 会这样，token 统计不受影响。
@@ -295,7 +311,7 @@ OpenCode 如果改了 slot 名，footer 会消失（插件只打印一次警告�
 通常可以；最脆的是选择器。升级后 footer 消失的话，带上 OpenCode 版本和截图开 issue。
 
 **汇率是怎么定的？**
-默认用手动 `usdToCny`（`6.68`）。设成 `"usdToCny": "auto"` 会每天拉一次汇率、缓存 24 小时；失败时用上次缓存或 `6.68` 兜底。tooltip 会显示汇率、来源和自动更新的日期。
+默认用手动 `usdToCny`（`6.68`）。设成 `"usdToCny": "auto"` 会每天拉一次汇率、缓存 24 小时；失败时用上次缓存或 `6.68` 兜底。明细卡会显示汇率、来源和自动更新的日期。
 
 **刷新频率能调吗？**
 可以。`refreshMode: "continuous"` 用 `sampleMs`（50–1000，默认 100）和 `smoothMs`（50–2000，默认 250）；`refreshMode: "interval"` 用 `refreshMs`（16–5000，默认 500）和 `tweenMs`（0–2000，默认 550）。窗口隐藏时暂停采样，重新可见时立即刷新。
@@ -306,7 +322,7 @@ OpenCode 如果改了 slot 名，footer 会消失（插件只打印一次警告�
 ## Roadmap
 
 - 按单条 assistant 消息显示的模式。
-- tooltip 里显示上下文使用率。
+- 明细卡里显示上下文使用率。
 - 导出每轮 usage 为 CSV/JSON。
 - 按供应商维护价格表，替代单一的 USD→CNY 汇率。
 - 用设置面板代替 JSON options。
@@ -327,10 +343,14 @@ npm run check   # build + test
 
 ```text
 src/core.cjs              纯聚合 / 格式化逻辑
-src/gui.cjs               插件生命周期、DOM、动画
+src/footer.cjs            footer DOM、明细卡与交互
+src/placement.cjs         不依赖 DOM 的卡片定位计算
+src/gui.cjs               插件生命周期、DOM 发现、动画
 dist/gui-experimental.cjs 构建后的单文件 CJS（已提交）
-test/core.test.cjs        单元测试
+test/core.test.cjs        聚合 / 格式化测试
+test/placement.test.cjs   卡片定位边界测试
 scripts/build.mjs         esbuild 打包
+assets/mock.html          可交互示意图
 ```
 
 本地开发时，每次 build 后把 `dist/gui-experimental.cjs` 复制到插件目录，或者直接把插件指向仓库目录再重载。

@@ -17,6 +17,7 @@ const {
   normalizeRefreshMode,
   sameTotals,
   smoothingAlpha,
+  tokenComposition,
   tokenUsage,
   visibleMessages,
 } = require("../src/core.cjs")
@@ -176,6 +177,52 @@ test("cacheHitRate uses prompt tokens only", () => {
   assert.equal(cacheHitRate({ input: 100, cacheRead: 100, cacheWrite: 0 }), 50)
   assert.equal(cacheHitRate({ input: 0, cacheRead: 0, cacheWrite: 0 }), null)
   assert.equal(cacheHitRate({ input: 0, cacheRead: 10, cacheWrite: 0 }), 100)
+})
+
+test("tokenComposition turns totals into shares that sum to one", () => {
+  const parts = tokenComposition({
+    input: 100,
+    output: 50,
+    reasoning: 25,
+    cacheRead: 800,
+    cacheWrite: 25,
+    total: 1000,
+  })
+
+  assert.deepEqual(
+    parts.map((part) => [part.key, part.value, Number(part.share.toFixed(3))]),
+    [
+      ["input", 100, 0.1],
+      ["output", 50, 0.05],
+      ["reasoning", 25, 0.025],
+      ["cacheRead", 800, 0.8],
+      ["cacheWrite", 25, 0.025],
+    ],
+  )
+  assert.equal(
+    parts.reduce((sum, part) => sum + part.share, 0),
+    1,
+  )
+})
+
+test("tokenComposition is safe for empty and negative input", () => {
+  assert.deepEqual(
+    tokenComposition({ total: 0 }).map((part) => part.share),
+    [0, 0, 0, 0, 0],
+  )
+  assert.deepEqual(
+    tokenComposition({ input: -10, total: 5 }).map((part) => part.value),
+    [0, 0, 0, 0, 0],
+  )
+})
+
+test("tokenComposition fills the bar even when totals are inconsistent", () => {
+  const parts = tokenComposition({ input: 1, output: 1, total: 100 })
+
+  assert.equal(
+    parts.reduce((sum, part) => sum + part.share, 0),
+    1,
+  )
 })
 
 test("sameTotals compares rounded values", () => {
