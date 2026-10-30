@@ -75,8 +75,9 @@ numbers that actually change the bill.
   composer dock — below the app's subagent/Goal pills and above the input, never inside the scrolling timeline.
   It starts at zero and updates live, then moves under the turn when the turn settles. Completed turns keep their
   capsules.
-- **On the top layer.** The details card is rendered in a fixed body portal at z-index 2147483000, so later
-  conversation rows, virtualized-row clipping, and the timeline scroll container cannot cover or clip it.
+- **Above the app's normal layers.** The details card is rendered in a fixed body portal at z-index 2147483000,
+  above the timeline, later messages and the composer, so normal stacking contexts cannot cover or clip it.
+  An app-level modal/dialog may still sit above it.
 - **A footer you can hit.** The visible line is a padded pill with a dedicated info button whose hit area extends
   past the glyph; no need to land on a single 12 px line.
 - **Keyboard accessible.** Tab to the info button, press Enter or Space to pin, Escape or an outside click to close.
@@ -135,7 +136,8 @@ open **Settings → Extensions → Plugins** and use **Reload**, or run `opencod
 
 ### Verify
 
-1. A footer appears under each completed or streaming turn.
+1. A footer appears under each completed turn; while a turn is streaming, its live capsule sits above the
+   composer.
 2. **Settings → Extensions → Plugins** lists `token-usage-gui` and its switch is on.
 3. `opencode plugin list` shows `token-usage-gui`.
 4. If something is off, check `~/.local/share/opencode/log/opencode.log` for `token-usage-gui`.
@@ -164,7 +166,7 @@ Options go in the plugin entry of `opencode.json(c)`:
         "showCost": true,
         "popoverSide": "left",
         "animate": true,
-        "refreshMode": "continuous", // default; set "interval" for the two options below
+        "refreshMode": "continuous", // default; "interval" switches to refreshMs/tweenMs
         "sampleMs": 100,
         "smoothMs": 250,
         "refreshMs": 500, // interval mode only
@@ -340,7 +342,8 @@ For the TUI, use the CLI's built-in `debug.turn_tokens` or one of the terminal-o
 ## FAQ
 
 **Does it send my prompts or session data anywhere?**
-No. There is no network code in the plugin.
+No session data is sent anywhere. The only network request is the opt-in daily USD→CNY rate fetch
+(`usdToCny: "auto"`); the default plugin is fully offline.
 
 **Why per-turn instead of per-message?**
 A turn can contain many assistant requests and tool loops. Per-message numbers look smaller but are misleading.
@@ -361,8 +364,9 @@ Yes: set `"popoverSide": "left"` (default) or `"popoverSide": "right"`. The chos
 then above; it does not switch to the other side.
 
 **Why is the card never cut off by later messages?**
-It is rendered into a fixed portal on `document.body` at the maximum z-index, not inside the scrolling timeline
-row. Later messages, row clipping and the composer cannot paint over it.
+It is rendered into a fixed portal on `document.body` at a very high z-index (2147483000), above the app's
+normal stacking contexts, not inside the scrolling timeline row. Later messages, row clipping and the composer
+cannot paint over it.
 
 **Why is the cost zero?**
 The provider did not report a cost for that request. Free models and some local providers do not report one.
@@ -378,7 +382,7 @@ date when it was automatic.
 
 **Can I change how often the footer refreshes?**
 Yes: `sampleMs` (50–1000, default 100) controls continuous sampling and `smoothMs` (50–2000, default 250) controls
-the follow speed; interval mode uses `refreshMs` (200–5000, default 500) and `tweenMs` (0–2000, default 550). The
+the follow speed; interval mode uses `refreshMs` (16–5000, default 500) and `tweenMs` (0–2000, default 550). The
 timer pauses while the window is hidden.
 
 **Does it work in the TUI?**

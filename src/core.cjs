@@ -52,14 +52,15 @@ function approachValue(current, target, alpha) {
   return finite(current) + (finite(target) - finite(current)) * a
 }
 
-/**
- * Resolve the display currency. "auto" follows the UI language: Chinese gets
- * CNY, everything else gets USD (the app's native billing currency).
- */
+/** "interval" or "continuous" (default). */
 function normalizeRefreshMode(value) {
   return String(value || "continuous").toLowerCase() === "interval" ? "interval" : "continuous"
 }
 
+/**
+ * Resolve the display currency. "auto" follows the UI language: Chinese gets
+ * CNY, everything else gets USD (the app's native billing currency).
+ */
 function normalizeCurrency(value, locale) {
   const code = String(value || "CNY").toUpperCase()
   if (code === "USD") return "USD"

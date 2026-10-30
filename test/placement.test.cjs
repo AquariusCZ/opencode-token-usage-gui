@@ -88,3 +88,15 @@ test("malformed input still degrades to the safe edge instead of NaN", () => {
   assert.equal(result.top, 8)
   assert.equal(result.placement, "left")
 })
+
+test("when nothing fits, the card stays inside the nearest edges", () => {
+  const result = placeTooltip({
+    anchor: { top: 90, bottom: 120, left: 40, right: 260 },
+    pop: { width: 300, height: 260 },
+    bounds: { top: 0, bottom: 200, left: 0, right: 300 },
+  })
+
+  assert.equal(result.placement, "top")
+  assert.equal(result.left, 8)
+  assert.equal(result.top, 8)
+})

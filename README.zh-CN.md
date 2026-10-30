@@ -67,8 +67,8 @@
   并自动夹在浏览器窗口可视区域内，滚动/缩放时跟随。
 - **执行中也有胶囊。** 思考或工具执行时，胶囊显示在输入框上方的 composer dock 独立一行：在应用的 subagent/Goal
   胶囊下方、输入框上方，不再放进滚动时间线。从 0 实时更新，结束后归位到回复下方；已完成轮次保留各自胶囊。
-- **弹窗在最上层。** 明细卡渲染到 `document.body` 的 fixed portal，z-index 为 2147483000，后续对话、虚拟列表
-  行的裁剪和时间线滚动容器都无法盖住或裁掉它。
+- **位于应用普通层叠之上。** 明细卡渲染到 `document.body` 的 fixed portal，z-index 为 2147483000，位于时间线、
+  后续消息和输入区之上，普通层叠上下文无法遮住或裁掉它。应用自身的 modal/对话框仍可能盖在它上面。
 - **更容易对准。** 可见行本身是一块带内边距的胶囊，行尾有独立 ⓘ 按钮，点击热区比图标更大，不用再
   精确地停在一条 12px 的细线上。
 - **键盘可用。** Tab 到 ⓘ，Enter / Space 钉住，Esc 或点击外部关闭；`prefers-reduced-motion` 下关闭过渡动画。
@@ -116,7 +116,7 @@ OpenCode 会自动发现 `~/.config/opencode/plugins/` 下的插件目录。如�
 
 ### 确认安装成功
 
-1. 每一轮完成或生成中的消息下方出现 footer。
+1. 每一轮完成后，回复下方出现 footer；生成中的那一轮，胶囊显示在输入框上方。
 2. **设置 → 扩展 → 插件** 里有 `token-usage-gui`，开关是开的。
 3. `opencode plugin list` 能看到 `token-usage-gui`。
 4. 有问题就看 `~/.local/share/opencode/log/opencode.log` 里有没有 `token-usage-gui`。
@@ -144,7 +144,7 @@ opencode plugin remove opencode-token-usage-gui
         "showCost": true,
         "popoverSide": "left",
         "animate": true,
-        "refreshMode": "continuous", // 默认；改成 "interval" 才使用下面两个
+        "refreshMode": "continuous", // 默认；改成 "interval" 会使用 refreshMs/tweenMs
         "sampleMs": 100,
         "smoothMs": 250,
         "refreshMs": 500, // 仅 interval 模式
@@ -303,7 +303,7 @@ OpenCode 如果改了 slot 名，footer 会消失（插件只打印一次警告�
 ## 常见问题
 
 **会把我的 prompt 或会话数据发到哪里吗？**
-不会。插件里没有网络代码。
+不会发送会话数据。唯一的网络请求是显式开启 `usdToCny: "auto"` 时的每日 USD→CNY 汇率；默认完全离线。
 
 **为什么按轮，不按每条消息？**
 一轮里可能有很多 assistant 请求和工具循环；按单条消息显示会漏掉大部分消耗。想要更多指标可以开 `detailed`。
@@ -321,7 +321,7 @@ OpenCode 如果改了 slot 名，footer 会消失（插件只打印一次警告�
 可以：`"popoverSide": "left"`（默认）或 `"right"`。优先配置的方向，放不下时依次退到下方、上方，不会换到另一侧。
 
 **为什么弹窗不会被下面的对话盖住？**
-卡片渲染在 `document.body` 的 fixed portal 里，使用最高层级，不在滚动行内部；后续消息、行裁剪和输入区都盖不到它。
+卡片渲染在 `document.body` 的 fixed portal 里，使用很高的层级（2147483000），位于应用普通层叠上下文之上，不在滚动行内部；后续消息、行裁剪和输入区都盖不到它。应用自身的 modal/对话框仍可能盖在它上面。
 
 **为什么费用是 0？**
 该请求没有上报 cost。免费模型和部分本地 provider 会这样，token 统计不受影响。

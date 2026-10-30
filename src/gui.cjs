@@ -89,9 +89,11 @@ const COPY = {
 function pickLocale(ctx) {
   try {
     const value = ctx.locale && typeof ctx.locale.locale === "function" ? ctx.locale.locale() : ""
-    if (value) return String(value).toLowerCase()
+    if (value) return String(value).toLowerCase().replace(/_/g, "-")
   } catch {}
-  if (typeof navigator !== "undefined" && navigator.language) return navigator.language.toLowerCase()
+  if (typeof navigator !== "undefined" && navigator.language) {
+    return navigator.language.toLowerCase().replace(/_/g, "-")
+  }
   return "en"
 }
 
@@ -165,6 +167,18 @@ function collectRows(scroll) {
     if (row) rows.push(row)
   }
   return rows
+}
+
+/**
+ * Several composer faces can be mounted at once (permission or subagent
+ * panels); pick the visible one with the largest box, like findScroll does.
+ */
+function findComposerFace() {
+  const faces = Array.from(
+    document.querySelectorAll('[data-slot="composer-face"]'),
+  ).filter(isVisible)
+  if (faces.length === 0) return null
+  return faces.reduce((best, item) => (area(item) > area(best) ? item : best), faces[0])
 }
 
 function contentTarget(row) {
@@ -245,6 +259,15 @@ module.exports = Plugin.define({
   setup(ctx) {
     const locale = pickLocale(ctx)
     const copy = locale.startsWith("zh") ? COPY.zh : COPY.en
+    // A malformed or unsupported hint (for example "zh_CN-x") makes Intl throw;
+    // resolve once and fall back to en-US so formatting never breaks.
+    const resolvedLocale = (() => {
+      try {
+        return new Intl.NumberFormat(locale).resolvedOptions().locale
+      } catch {
+        return "en-US"
+      }
+    })()
     const options = ctx.options || {}
     const compact = options.compact === true
     const detailed = options.detailed === true
@@ -261,15 +284,15 @@ module.exports = Plugin.define({
     const autoRate = String(options.usdToCny).toLowerCase() === "auto"
     const manualRate = finite(options.usdToCny) > 0 ? finite(options.usdToCny) : DEFAULT_USD_TO_CNY
     const rate = { value: manualRate, at: 0, source: "manual" }
-    const intFmt = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 })
-    const pctFmt = new Intl.NumberFormat(locale, {
+    const intFmt = new Intl.NumberFormat(resolvedLocale, { maximumFractionDigits: 0 })
+    const pctFmt = new Intl.NumberFormat(resolvedLocale, {
       style: "percent",
       minimumFractionDigits: 1,
       maximumFractionDigits: 1,
     })
 
     const view = {
-      locale,
+      locale: resolvedLocale,
       copy,
       compact,
       detailed,
@@ -281,14 +304,20 @@ module.exports = Plugin.define({
         formatMoney(
           finite(usd) * (currency === "CNY" ? rate.value : 1),
           currency,
-          locale,
+          resolvedLocale,
         ),
       rateLine: () => {
         if (currency !== "CNY" || !(rate.value > 0)) return ""
         let source = copy.rateManual
         if (rate.source === "auto") {
           source = copy.rateAuto
-          if (rate.at > 0) source += ` (${new Date(rate.at).toISOString().slice(0, 10)})`
+          if (rate.at > 0) {
+            const date = new Date(rate.at)
+            const stamp = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+              date.getDate(),
+            ).padStart(2, "0")}`
+            source += ` (${stamp})`
+          }
         } else if (rate.source === "fallback") {
           source = copy.rateFallback
         }
@@ -305,6 +334,15 @@ module.exports = Plugin.define({
           frame = requestAnimationFrame(tick)
         }
       },
+    }
+
+    // Tear down the previous instance first: it may still own (and remove) the
+    // <style> node that installStyle() is about to reuse.
+    const previous = window[GUARD_KEY]
+    if (previous && typeof previous.cleanup === "function") {
+      try {
+        previous.cleanup()
+      } catch {}
     }
 
     let styleNode = null
@@ -361,9 +399,10 @@ module.exports = Plugin.define({
      * Older builds without a composer face fall back to the timeline tail.
      */
     const ensureLiveHost = (scroll) => {
-      const face = document.querySelector('[data-slot="composer-face"]')
+      const face = findComposerFace()
       const column = face && face.parentElement
-      if (column && face.parentElement === column) {
+      const dock = column && column.closest('[data-component="session-composer-dock"]')
+      if (face && column && dock) {
         let host = column.querySelector(":scope > [data-token-usage-live]")
         if (!host) {
           host = document.createElement("div")
@@ -436,6 +475,8 @@ module.exports = Plugin.define({
       const seen = new Set()
       let sessionId = null
       let known = null
+      let running = false
+      let activeTurnId = null
       try {
         const session = ctx.sessions.current()
         if (!session || !session.id) return
@@ -457,14 +498,14 @@ module.exports = Plugin.define({
         observe(scroll)
 
         const statusApi = data.session && data.session.status
-        let running = false
+        running = false
         if (typeof statusApi === "function") {
           try {
             running = statusApi.call(data.session, session.id) === "running"
           } catch {}
         }
         const turnIds = Array.from(turns.keys())
-        const activeTurnId = running ? turnIds[turnIds.length - 1] : null
+        activeTurnId = running ? turnIds[turnIds.length - 1] : null
         const liveHost = running ? ensureLiveHost(scroll) : null
 
         const byMessage = new Map()
@@ -527,9 +568,9 @@ module.exports = Plugin.define({
             applyTurn(entry, turn, view, animate)
           }
 
-          let target = null
-          if (active && liveHost) target = liveHost
-          else if (row) target = contentTarget(row)
+          const useLive = Boolean(active && liveHost)
+          entry.docked = useLive
+          const target = useLive ? liveHost : row ? contentTarget(row) : null
           if (!target) continue
 
           if (
@@ -544,8 +585,10 @@ module.exports = Plugin.define({
         }
       } finally {
         // Drop entries that no longer belong here. Same-session footers stay
-        // attached through a transient re-render, but a session switch, a
-        // reverted turn or a detached row removes them.
+        // attached through a transient re-render, and the docked active turn
+        // stays in the composer dock while it is still running; a session
+        // switch, a finished turn, a reverted turn or a detached row removes
+        // them.
         for (const [key, entry] of state) {
           if (seen.has(key)) continue
           let stale = true
@@ -561,6 +604,8 @@ module.exports = Plugin.define({
               stale = !(id && known.has(id))
             }
           }
+          const turnId = key.slice(`${sessionId}:`.length)
+          if (entry.docked && running && turnId === activeTurnId) stale = false
           if (!stale) continue
           state.delete(key)
           if (entry.dispose) entry.dispose()
@@ -689,16 +734,11 @@ module.exports = Plugin.define({
         entry.root.remove()
       }
       state.clear()
+      for (const host of document.querySelectorAll("[data-token-usage-live]")) host.remove()
       if (styleNode) styleNode.remove()
       if (window[GUARD_KEY] && window[GUARD_KEY].cleanup === cleanup) delete window[GUARD_KEY]
     }
 
-    const previous = window[GUARD_KEY]
-    if (previous && typeof previous.cleanup === "function" && previous.cleanup !== cleanup) {
-      try {
-        previous.cleanup()
-      } catch {}
-    }
     window[GUARD_KEY] = { cleanup }
 
     document.addEventListener("visibilitychange", onVisibilityChange)

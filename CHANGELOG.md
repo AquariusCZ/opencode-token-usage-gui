@@ -21,8 +21,9 @@
   line below the app's subagent/Goal pills and above the input. The app's z-70 composer lane can no longer paint
   over it; the dock's ResizeObserver updates the timeline inset. It starts at zero, updates live, and moves under
   the turn when it settles. Completed turns keep their own capsules.
-- **Top-layer card.** The details card is now a fixed body portal at z-index 2147483000, so virtualized-row
-  clipping, later messages and the composer cannot cover or cut it.
+- **Above the app's normal stacking contexts.** The details card is now a fixed body portal at z-index
+  2147483000, above the timeline, later messages and the composer, so virtualized-row clipping and normal
+  stacking contexts cannot cover or cut it.
 - **Theme-native.** Background, borders, elevation, text and overlay colors come from the desktop's own v2 tokens,
   so light and dark mode both look native. `prefers-reduced-motion` is honored.
 - **Actually pauses when hidden.** The sample timer is now cleared while the window is hidden (the README already
@@ -31,7 +32,9 @@
   the app removed no longer leaves a footer behind, while a transient re-render keeps the existing ones.
 - **Zero buckets no longer leave stray separators.** Hidden items now hide their leading separator too.
 - Cost-only turns (reported cost with zero tokens) now get a footer instead of being dropped.
-- 29 unit tests (was 18), including placement math and composition shares.
+- **Hardening.** The fallback stylesheet now survives a plugin reload; cleanup removes the live dock line; a docked
+  footer survives a transient row absence; FX dates use the local timezone; malformed locales fall back to en-US.
+  Added a no-fit placement test (30 tests).
 - Refreshed the interactive mock and screenshot; added an in-page light/dark toggle.
 
 ## 0.2.2 — 2026-10-30
