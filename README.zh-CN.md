@@ -4,9 +4,10 @@
 
 **每一轮到底花了多少，直接写在回复下面。**
 
-给 **OpenCode Desktop** 的零配置 GUI 插件：按轮统计 token、缓存命中率和人民币费用。
+给 **OpenCode Desktop V2**（2.2.3+）的零配置 GUI 插件：按轮统计 token、缓存命中率和人民币费用。仅支持 V2 桌面端，不适用于 TUI。
 
 [![CI](https://github.com/AquariusCZ/opencode-token-usage-gui/actions/workflows/ci.yml/badge.svg)](https://github.com/AquariusCZ/opencode-token-usage-gui/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/AquariusCZ/opencode-token-usage-gui?label=release&color=111827)](https://github.com/AquariusCZ/opencode-token-usage-gui/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![OpenCode Desktop](https://img.shields.io/badge/OpenCode%20Desktop-2.2.3%2B-111827)](https://opencode.ai/)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/AquariusCZ/opencode-token-usage-gui/issues)
@@ -14,6 +15,12 @@
 [安装](#安装) · [功能](#功能) · [配置](#配置) · [实现](#实现方式) · [常见问题](#常见问题) · [English](README.md)
 
 </div>
+
+```sh
+opencode plugin add github:AquariusCZ/opencode-token-usage-gui
+```
+
+然后重载窗口（`Ctrl/Cmd + R`）或运行 `opencode service restart`；完整选项见[安装](#安装)。
 
 ![OpenCode Desktop 的每轮 token footer](assets/screenshot-en.png)
 

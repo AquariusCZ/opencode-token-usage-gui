@@ -4,9 +4,11 @@
 
 **See what every turn actually costs — right under the reply.**
 
-A zero-config GUI plugin for **OpenCode Desktop**: per-turn tokens, cache hit rate and RMB cost.
+A zero-config GUI plugin for **OpenCode Desktop V2** (2.2.3+): per-turn tokens, cache hit rate and RMB cost.
+Requires the V2 desktop app; it does not work in the TUI.
 
 [![CI](https://github.com/AquariusCZ/opencode-token-usage-gui/actions/workflows/ci.yml/badge.svg)](https://github.com/AquariusCZ/opencode-token-usage-gui/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/AquariusCZ/opencode-token-usage-gui?label=release&color=111827)](https://github.com/AquariusCZ/opencode-token-usage-gui/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![OpenCode Desktop](https://img.shields.io/badge/OpenCode%20Desktop-2.2.3%2B-111827)](https://opencode.ai/)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/AquariusCZ/opencode-token-usage-gui/issues)
@@ -14,6 +16,12 @@ A zero-config GUI plugin for **OpenCode Desktop**: per-turn tokens, cache hit ra
 [Install](#install) · [Features](#features) · [Configuration](#configuration) · [How it works](#how-it-works) · [FAQ](#faq) · [中文](README.zh-CN.md)
 
 </div>
+
+```sh
+opencode plugin add github:AquariusCZ/opencode-token-usage-gui
+```
+
+Then reload the window (`Ctrl/Cmd + R`) or run `opencode service restart`. Full options are under [Install](#install).
 
 ![OpenCode Desktop with a per-turn token footer](assets/screenshot-en.png)
 
