@@ -1337,10 +1337,12 @@ function findComposerFace(scroll) {
   if (faces.length === 0) return null;
   return faces.reduce((best, item) => area(item) > area(best) ? item : best, faces[0]);
 }
-var hasVisibleQueue = () => {
-  const panel = document.querySelector('[data-component="session-queue-panel"]');
-  if (!panel || !isVisible(panel)) return false;
-  return Boolean(panel.querySelector('[data-component="session-queue-row"]'));
+var hasVisibleQueue = (scroll) => {
+  const panel = scroll && scroll.closest ? scroll.closest('[data-slot="session-chat-panel"]') : null;
+  const scope = panel || document;
+  return Array.from(scope.querySelectorAll('[data-component="session-queue-panel"]')).some(
+    (element) => isVisible(element) && Boolean(element.querySelector('[data-component="session-queue-row"]'))
+  );
 };
 function contentTarget(row) {
   return row.closest('[data-slot="session-turn-assistant-content"]') || row.querySelector('[data-slot="session-turn-assistant-content"]') || row.closest('[data-slot="session-turn-message-container"]') || row.querySelector('[data-slot="session-turn-message-content"]') || row;
@@ -1615,7 +1617,7 @@ module.exports = Plugin.define({
         const turnIds = Array.from(turns.keys());
         activeTurnId = running ? turnIds[turnIds.length - 1] : null;
         const summary = summarizeTurns(turns);
-        const hasSummary = !running && !hasVisibleQueue() && (summary.totals.total > 0 || summary.cost > 0);
+        const hasSummary = !running && !hasVisibleQueue(scroll) && (summary.totals.total > 0 || summary.cost > 0);
         const liveHost = running || hasSummary ? ensureLiveHost(scroll) : null;
         const byMessage = /* @__PURE__ */ new Map();
         known = new Set(turns.keys());
@@ -1626,7 +1628,7 @@ module.exports = Plugin.define({
           }
         }
         const rows = collectRows(scroll);
-        if (rows.length === 0 && !running) return;
+        if (rows.length === 0 && !running && !hasSummary) return;
         const chosen = /* @__PURE__ */ new Map();
         for (const row of rows) {
           const id = row.getAttribute("data-message-id");
@@ -1687,6 +1689,7 @@ module.exports = Plugin.define({
           let entry = state.get(key);
           if (!entry) {
             entry = createFooter(summary, view);
+            entry.sessionSummary = true;
             entry.target = { ...summary.totals };
             entry.current = { ...summary.totals };
             entry.from = { ...summary.totals };
@@ -1718,6 +1721,7 @@ module.exports = Plugin.define({
               stale = !(id && known.has(id));
             }
           }
+          if (entry.sessionSummary && !known) stale = true;
           const turnId = key.slice(`${sessionId}:`.length);
           if (entry.docked && running && turnId === activeTurnId) stale = false;
           if (!stale) continue;

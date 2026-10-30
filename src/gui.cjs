@@ -194,13 +194,17 @@ function findComposerFace(scroll) {
 }
 
 /**
- * True while the composer's queue panel is on screen and has at least one row.
- * The panel stays mounted (hidden) with no rows when the queue is empty.
+ * True while a composer's queue panel in the active session pane is on screen
+ * and has at least one row. The panel stays mounted (hidden) with no rows when
+ * the queue is empty, and other panes may be mounted at the same time.
  */
-const hasVisibleQueue = () => {
-  const panel = document.querySelector('[data-component="session-queue-panel"]')
-  if (!panel || !isVisible(panel)) return false
-  return Boolean(panel.querySelector('[data-component="session-queue-row"]'))
+const hasVisibleQueue = (scroll) => {
+  const panel = scroll && scroll.closest ? scroll.closest('[data-slot="session-chat-panel"]') : null
+  const scope = panel || document
+  return Array.from(scope.querySelectorAll('[data-component="session-queue-panel"]')).some(
+    (element) =>
+      isVisible(element) && Boolean(element.querySelector('[data-component="session-queue-row"]')),
+  )
 }
 
 function contentTarget(row) {
@@ -543,7 +547,7 @@ module.exports = Plugin.define({
         const summary = summarizeTurns(turns)
         const hasSummary =
           !running &&
-          !hasVisibleQueue() &&
+          !hasVisibleQueue(scroll) &&
           (summary.totals.total > 0 || summary.cost > 0)
         const liveHost = running || hasSummary ? ensureLiveHost(scroll) : null
 
@@ -557,7 +561,7 @@ module.exports = Plugin.define({
         }
 
         const rows = collectRows(scroll)
-        if (rows.length === 0 && !running) return
+        if (rows.length === 0 && !running && !hasSummary) return
 
         const chosen = new Map()
         for (const row of rows) {
@@ -629,6 +633,7 @@ module.exports = Plugin.define({
           let entry = state.get(key)
           if (!entry) {
             entry = createFooter(summary, view)
+            entry.sessionSummary = true
             entry.target = { ...summary.totals }
             entry.current = { ...summary.totals }
             entry.from = { ...summary.totals }
@@ -669,6 +674,7 @@ module.exports = Plugin.define({
               stale = !(id && known.has(id))
             }
           }
+          if (entry.sessionSummary && !known) stale = true
           const turnId = key.slice(`${sessionId}:`.length)
           if (entry.docked && running && turnId === activeTurnId) stale = false
           if (!stale) continue
