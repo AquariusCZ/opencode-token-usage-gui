@@ -55,10 +55,9 @@ distinction between "sum of the transcript" and "what the session was billed", i
 
 Do these in order. Posting before the release page matches the code is the most common way to waste a launch.
 
-- [x] **Push `main`.** v0.3.0 is public on GitHub; the repo and README are the product page.
-- [x] **Tag and release v0.3.0.** Public, with the install path on GitHub.
-- [ ] **Tag and release v0.3.1.** Use `docs/release-0.3.1.md` as the release body. Attach nothing unless there is a
-      real artifact; the install path is GitHub.
+- [x] **Push `main`.** v0.3.1 is public on GitHub; the repo and README are the product page.
+- [x] **Tag and release v0.3.0.** Public, then superseded by v0.3.1 with a note on the release page.
+- [x] **Tag and release v0.3.1.** Public, with the install path on GitHub.
 - [x] **Leave npm alone.** `opencode-token-usage-gui` on npm is a `0.0.0-stage` placeholder. Do not advertise
       `npm install`, and do not publish to npm as part of the launch.
 - [ ] **Real screenshot or GIF.** `assets/screenshot-en.png` is an explicitly labeled illustrative mock. Record a
@@ -69,8 +68,10 @@ Do these in order. Posting before the release page matches the code is the most 
 - [x] **Upload the social preview.** Settings → General → Social preview → upload `assets/social-preview.png`
       (1280×640).
 - [ ] **Confirm issue templates render.** Open `/issues/new/choose` and check the two forms and the contact link.
-- [ ] **Re-read the README top.** It should state the V2 requirement, the install command and the mock disclaimer
+- [x] **Re-read the README top.** It should state the V2 requirement, the install command and the mock disclaimer
       within the first screen.
+
+The only remaining manual step is uploading the refreshed 1280×640 social preview in Settings → General → Social preview; GitHub has no API for that field.
 
 ## 4. Channel plan
 
