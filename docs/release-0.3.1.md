@@ -14,8 +14,9 @@ shows the session summary; per-turn capsules stay under their turn.
   thinking or running tools; a queued or steered prompt never creates a zero-value capsule.
 - **Turns follow the app's idle markers.** A turn opens at the first user prompt of an execution and closes at the
   next `idle` marker. Steers and delivered queued prompts belong to the running turn; synthetic, system and
-  compaction notices never start one. Transcripts without idle markers (older sessions) fall back to user-message
-  boundaries, so their history is preserved.
+  compaction notices never split a running turn; an orphan notice owns the assistant usage that follows.
+  Transcripts without idle markers (older sessions) fall back to user-message boundaries, so their history is
+  preserved.
 - **Steer rows track the turn.** Rows whose `data-message-id` is the delivered steer id now resolve to the turn, so
   the capsule follows the live end of the turn.
 - **First-step summary.** The summary keeps the transcript totals until the session ledger reports tokens, so it no

@@ -296,7 +296,8 @@ input + output + reasoning + cache.read + cache.write
 
 - **Turn** is delimited by the app's idle markers: it opens at the first user prompt of an execution and closes at
   the next idle marker. Prompts steered in or queued during the turn belong to it; synthetic/system/compaction
-  notices never start a turn. Transcripts recorded before idle markers existed fall back to user-message
+  notices never split a running turn. An orphan notice (for example a subagent result with no user prompt) owns
+  the assistant usage that follows. Transcripts recorded before idle markers existed fall back to user-message
   boundaries.
 - **Cache hit rate** is `cache.read / (input + cache.read + cache.write)`. It describes how much of the prompt was
   served from cache.

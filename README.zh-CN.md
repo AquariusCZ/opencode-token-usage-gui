@@ -261,7 +261,7 @@ opencode plugin remove opencode-token-usage-gui
 input + output + reasoning + cache.read + cache.write
 ```
 
-- **一轮**：由应用的 idle 标记分界：一次执行的第一条用户 prompt 开始，到下一个 idle 标记结束。这一轮中途引导或排队的 prompt 属于本轮；synthetic/system/compaction 通知不会开启新一轮。早于 idle 标记的旧会话回退到用户消息边界。
+- **一轮**：由应用的 idle 标记分界：一次执行的第一条用户 prompt 开始，到下一个 idle 标记结束。这一轮中途引导或排队的 prompt 属于本轮；synthetic/system/compaction 只作为通知，不会切断正在运行的轮次；没有 user prompt 的孤儿通知（例如子代理结果）会承接其后的 assistant 用量。早于 idle 标记的旧会话回退到用户消息边界。
 - **缓存命中率**：`cache.read / (input + cache.read + cache.write)`，表示 prompt 里有多大比例来自缓存。
 - **费用**：来自应用上报的每请求 `message.cost`（美元）。人民币只是显示换算，不是第二套计费。
 - **请求次数**：有 usage 记录的 assistant 消息数，不是工具调用次数。

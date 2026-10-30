@@ -8,8 +8,9 @@
 - **Per-turn capsules stay under their turn.** The active turn's capsule updates in place in the transcript; a
   queued or steered prompt never creates a zero-value capsule.
 - **Turns follow the app's idle markers.** Steers and delivered queued prompts belong to the running turn;
-  synthetic/system/compaction notices never start one. Transcripts without idle markers (older sessions) fall back
-  to user-message boundaries, so their turn history is preserved.
+  synthetic/system/compaction notices never split a running turn; an orphan notice owns the assistant usage that
+  follows. Transcripts without idle markers (older sessions) fall back to user-message boundaries, so their turn
+  history is preserved.
 - **Steer rows track the turn.** Rows whose `data-message-id` is the delivered steer id now resolve to the turn, so
   the capsule follows the live end of the turn.
 - **First-step summary.** The summary keeps the transcript totals until the session ledger reports tokens, so it no
