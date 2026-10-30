@@ -10,6 +10,7 @@ const {
   finite,
   formatMoney,
   normalizeCurrency,
+  normalizePopoverSide,
   normalizeRefreshMode,
   sameTotals,
   smoothingAlpha,
@@ -256,6 +257,7 @@ module.exports = Plugin.define({
     const smoothMs = clampNumber(options.smoothMs, MIN_SMOOTH_MS, MAX_SMOOTH_MS, DEFAULT_SMOOTH_MS)
     const animate = options.animate !== false && !reducedMotion() && (continuous || tweenMs > 0)
     const currency = normalizeCurrency(options.currency, locale)
+    const popoverSide = normalizePopoverSide(options.popoverSide)
     const autoRate = String(options.usdToCny).toLowerCase() === "auto"
     const manualRate = finite(options.usdToCny) > 0 ? finite(options.usdToCny) : DEFAULT_USD_TO_CNY
     const rate = { value: manualRate, at: 0, source: "manual" }
@@ -274,6 +276,7 @@ module.exports = Plugin.define({
       showCost,
       continuous,
       currency,
+      popoverSide,
       money: (usd) =>
         formatMoney(
           finite(usd) * (currency === "CNY" ? rate.value : 1),

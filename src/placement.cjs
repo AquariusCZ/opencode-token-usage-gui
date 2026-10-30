@@ -3,11 +3,12 @@
 /**
  * Pure placement math for the details card.
  *
- * The card prefers the free gutter to the right of the footer, then the space
- * below it, then the space above, and is clamped so it never leaves the
- * visible timeline area. Sitting beside the footer keeps the card off the
- * turn's step rows on a wide window. Keeping this DOM-free makes the edge
- * cases testable in Node.
+ * The card prefers the configured side (default: the free gutter to the left of
+ * the footer), then the space below it, then the space above, and is clamped so
+ * it never leaves the visible timeline area. It never switches to the opposite
+ * side, so the configured direction stays predictable. Sitting beside the footer
+ * keeps the card off the turn's step rows on a wide window. Keeping this DOM-free
+ * makes the edge cases testable in Node.
  */
 
 function clamp(value, min, max) {
@@ -22,7 +23,8 @@ function clamp(value, min, max) {
  * @param {{top:number,bottom:number,left:number,right:number}} input.bounds visible area
  * @param {number} [input.gap] space between footer and card
  * @param {number} [input.pad] minimum distance to the visible edges
- * @returns {{left:number, top:number, placement:"right"|"bottom"|"top"}}
+ * @param {"left"|"right"} [input.side] preferred side, defaults to left
+ * @returns {{left:number, top:number, placement:"left"|"right"|"bottom"|"top"}}
  */
 function placeTooltip(input) {
   const anchor = (input && input.anchor) || {}
@@ -30,6 +32,7 @@ function placeTooltip(input) {
   const bounds = (input && input.bounds) || {}
   const gap = Number.isFinite(input && input.gap) ? input.gap : 8
   const pad = Number.isFinite(input && input.pad) ? input.pad : 8
+  const side = input && String(input.side).toLowerCase() === "right" ? "right" : "left"
 
   const anchorTop = Number.isFinite(anchor.top) ? anchor.top : 0
   const anchorBottom = Number.isFinite(anchor.bottom) ? anchor.bottom : anchorTop
@@ -43,17 +46,20 @@ function placeTooltip(input) {
   const left = Number.isFinite(bounds.left) ? bounds.left : 0
   const right = Number.isFinite(bounds.right) ? bounds.right : left
 
+  const roomLeft = anchorLeft - gap - popWidth - (left + pad)
   const roomRight = right - pad - (anchorRight + gap) - popWidth
   const roomBelow = bottom - pad - (anchorBottom + gap) - popHeight
   const roomAbove = anchorTop - gap - popHeight - (top + pad)
 
-  let placement = "right"
-  if (roomRight >= 0) placement = "right"
+  const sideRoom = side === "left" ? roomLeft : roomRight
+
+  let placement
+  if (sideRoom >= 0) placement = side
   else if (roomBelow >= 0) placement = "bottom"
   else if (roomAbove >= 0) placement = "top"
   else {
     const rooms = [
-      ["right", roomRight],
+      [side, sideRoom],
       ["bottom", roomBelow],
       ["top", roomAbove],
     ]
@@ -62,7 +68,10 @@ function placeTooltip(input) {
 
   let resolvedLeft
   let resolvedTop
-  if (placement === "right") {
+  if (placement === "left") {
+    resolvedLeft = clamp(anchorLeft - gap - popWidth, left + pad, right - pad - popWidth)
+    resolvedTop = clamp(anchorTop, top + pad, bottom - pad - popHeight)
+  } else if (placement === "right") {
     resolvedLeft = clamp(anchorRight + gap, left + pad, right - pad - popWidth)
     resolvedTop = clamp(anchorTop, top + pad, bottom - pad - popHeight)
   } else {

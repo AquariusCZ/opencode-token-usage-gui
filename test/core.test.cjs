@@ -14,6 +14,7 @@ const {
   formatMoney,
   formatPercent,
   normalizeCurrency,
+  normalizePopoverSide,
   normalizeRefreshMode,
   sameTotals,
   smoothingAlpha,
@@ -243,6 +244,14 @@ test("normalizeCurrency resolves explicit and automatic modes", () => {
   assert.equal(normalizeCurrency("auto", "zh-CN"), "CNY")
   assert.equal(normalizeCurrency("auto", "en-US"), "USD")
   assert.equal(normalizeCurrency(undefined, "en-US"), "CNY")
+})
+
+test("normalizePopoverSide defaults to the left gutter", () => {
+  assert.equal(normalizePopoverSide("right"), "right")
+  assert.equal(normalizePopoverSide("RIGHT"), "right")
+  assert.equal(normalizePopoverSide("left"), "left")
+  assert.equal(normalizePopoverSide(undefined), "left")
+  assert.equal(normalizePopoverSide("nonsense"), "left")
 })
 
 test("normalizeRefreshMode exposes the continuous/interval switch", () => {

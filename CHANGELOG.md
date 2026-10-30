@@ -12,9 +12,11 @@
 - **Readable at a glance.** The card adds a composition bar, a six-cell metric grid (input, output, reasoning,
   cache read, cache write, cache hit), request count, wall time, and the exchange-rate source. The visible footer
   stays compact.
-- **Out of the way.** The card prefers the free gutter to the right of the footer, then below, then above, so it
+- **Out of the way.** The card opens on the configured side (left by default), then below, then above, so it
   does not sit on top of the turn's step rows when the window has room. It clamps to the viewport and repositions
   on scroll and resize.
+- **Configurable card side.** `popoverSide` (`"left"` default, or `"right"`) picks the preferred gutter; if it
+  does not fit, the card falls back below, then above. It never switches to the opposite side.
 - **Live while it runs.** The active turn's capsule follows the app's working indicator — inline with it when it
   is shown, otherwise in the bottom tail lane — starts at zero, and updates live; it returns under the turn when
   the turn settles. Completed turns keep their own capsules.
@@ -28,7 +30,7 @@
   the app removed no longer leaves a footer behind, while a transient re-render keeps the existing ones.
 - **Zero buckets no longer leave stray separators.** Hidden items now hide their leading separator too.
 - Cost-only turns (reported cost with zero tokens) now get a footer instead of being dropped.
-- 27 unit tests (was 18), including placement math and composition shares.
+- 29 unit tests (was 18), including placement math and composition shares.
 - Refreshed the interactive mock and screenshot; added an in-page light/dark toggle.
 
 ## 0.2.2 — 2026-10-30

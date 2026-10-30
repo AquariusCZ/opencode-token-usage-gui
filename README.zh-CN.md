@@ -17,7 +17,7 @@
 
 ![OpenCode Desktop 的每轮 token footer](assets/screenshot-en.png)
 
-*英文示意图，非真实会话截图。*
+*英文示意图，非真实会话截图。示意图使用 `popoverSide: "right"`；默认是左侧。*
 
 > OpenCode Desktop 右上角显示的是「最近一次请求」和「整个会话累计」。
 > 它不回答「这一轮花了多少」。这个插件补的就是这一行。
@@ -63,7 +63,7 @@
 - **按轮统计，不是按单条消息。** 一轮一个 footer，汇总所有 assistant 请求和工具循环。
 - **一张真正可读的明细卡。** 悬停或聚焦 footer，弹出一张跟随应用主题的卡片：tokens 构成条、六格指标、
   请求次数、耗时和汇率来源。未钉住时卡片也能直接悬停（中间有看不见的 8px 悬停桥），点 ⓘ 可钉住卡片
-  持续阅读/复制。卡片优先放在 footer 右侧空白处，其次下方，最后上方；窗口够宽时不会覆盖本轮的 step 行，
+  持续阅读/复制。卡片优先放在配置方向（默认左侧）的空白处，其次下方，最后上方；窗口够宽时不会覆盖本轮的 step 行，
   并自动夹在浏览器窗口可视区域内，滚动/缩放时跟随。
 - **执行中也有胶囊。** 思考或工具执行时，胶囊跟随应用的实时状态：有“工作中”指示时直接显示在它同一行，否则停靠在底部
   86px 尾部区域；从 0 实时更新，结束后归位到回复下方。已完成的轮次保留各自的胶囊。
@@ -142,6 +142,7 @@ opencode plugin remove opencode-token-usage-gui
         "compact": false,
         "detailed": false,
         "showCost": true,
+        "popoverSide": "left",
         "animate": true,
         "refreshMode": "continuous", // 默认；改成 "interval" 才使用下面两个
         "sampleMs": 100,
@@ -161,6 +162,7 @@ opencode plugin remove opencode-token-usage-gui
 | `compact` | `false` | 只显示输入、输出、合计、费用。 |
 | `detailed` | `false` | 在可见行里额外显示推理 token 和缓存写。 |
 | `showCost` | `true` | 显示每轮费用。 |
+| `popoverSide` | `"left"` | 明细卡优先方向：`"left"` 或 `"right"`。优先尝试该方向，放不下时退到下方、再退到上方，不会自动换到另一侧。 |
 | `animate` | `true` | 是否动画；`false` 两种模式都直接跳。 |
 | `refreshMode` | `"continuous"` | `"continuous"`（连续计数）或 `"interval"`（间隔刷新 + tween）。 |
 | `sampleMs` | `100` | continuous 模式运行中的采样间隔，50–1000ms；空闲时 1000ms。 |
@@ -182,6 +184,12 @@ opencode plugin remove opencode-token-usage-gui
   ]
 }
 ```
+
+### 弹窗方向
+
+明细卡默认显示在 footer 左侧。设 `"popoverSide": "right"` 可以改成优先右侧。
+
+优先尝试配置的方向；窗口太窄放不下时，依次退到下方、上方，不会自动换到另一侧，保证方向可预期。
 
 ### 货币与汇率
 
@@ -270,7 +278,7 @@ user message
 2. 按前面的 user/synthetic 消息把 assistant 消息分组，累加 `tokens` 和 `cost`；
 3. 找到渲染出来的 assistant 内容容器（`[data-slot="session-turn-assistant-content"]`），把 footer 节点挂进去；
 4. 100ms 采样（空闲 1000ms）保持数据新鲜；`MutationObserver` 在应用重渲染时把 footer 挂回去；`requestAnimationFrame` 做数字动画；
-5. 应用把 `session.status` 报为 `running`（思考或工具执行）时，当前轮的 footer 直接挂到应用的 `[data-component="session-working"]` 那一行里（有则同行显示），没有该指示时退回 `[data-timeline-row="bottom-spacer"]` 里的 `.tu-live-lane`，从 0 开始实时更新；本轮结束后归位到回复内容下方。明细卡是 `document.body` 级的 fixed portal（z-index 2147483000），优先放在右侧空白处，其次下方，最后上方；窗口隐藏时暂停采样。
+5. 应用把 `session.status` 报为 `running`（思考或工具执行）时，当前轮的 footer 直接挂到应用的 `[data-component="session-working"]` 那一行里（有则同行显示），没有该指示时退回 `[data-timeline-row="bottom-spacer"]` 里的 `.tu-live-lane`，从 0 开始实时更新；本轮结束后归位到回复内容下方。明细卡是 `document.body` 级的 fixed portal（z-index 2147483000），优先配置方向（默认左侧），其次下方，最后上方；窗口隐藏时暂停采样。
 
 GUI 插件 API 目前没有官方的「消息底部插槽」，所以最后一步是 DOM 注入。这是整个插件最脆的地方：未来
 OpenCode 如果改了 slot 名，footer 会消失（插件只打印一次警告），不会污染时间线。选择器和聚合逻辑分别隔离在
@@ -308,6 +316,9 @@ OpenCode 如果改了 slot 名，footer 会消失（插件只打印一次警告�
 
 **怎么让卡片一直开着？**
 点 footer 行尾的 ⓘ 按钮钉住。钉住后可以直接选中文字复制；再点一次、按 Esc 或点卡片外关闭。
+
+**能选弹窗在左边还是右边吗？**
+可以：`"popoverSide": "left"`（默认）或 `"right"`。优先配置的方向，放不下时依次退到下方、上方，不会换到另一侧。
 
 **为什么弹窗不会被下面的对话盖住？**
 卡片渲染在 `document.body` 的 fixed portal 里，使用最高层级，不在滚动行内部；后续消息、行裁剪和输入区都盖不到它。

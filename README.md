@@ -17,7 +17,8 @@ A zero-config GUI plugin for **OpenCode Desktop**: per-turn tokens, cache hit ra
 
 ![OpenCode Desktop with a per-turn token footer](assets/screenshot-en.png)
 
-*Illustrative English mock of the footer and details card. Not a real session screenshot.*
+*Illustrative English mock of the footer and details card. Not a real session screenshot. The illustration shows
+`popoverSide: "right"`; the default is left.*
 
 > OpenCode Desktop shows the latest request and the session total. It does not show what **this turn** cost.
 > This plugin adds the missing line.
@@ -67,9 +68,9 @@ numbers that actually change the bill.
 - **A details card that is actually readable.** Hover or focus the footer for a theme-aware card with a token
   composition bar, a six-cell metric grid, request count, wall time, and the exchange-rate source. The card stays
   open while your pointer is over it (an invisible bridge covers the gap) and can be pinned with the info button
-  for persistent reading and copying. It prefers the free gutter to the right of the footer, then below it, then
-  above, so it does not cover the turn's step rows on a wide window; it clamps to the viewport and repositions on
-  scroll and resize.
+  for persistent reading and copying. It opens on the configured side of the footer (left by default), then below
+  it, then above, so it does not cover the turn's step rows on a wide window; it clamps to the viewport and
+  repositions on scroll and resize.
 - **Live from the first token.** While a turn is thinking or running tools, its capsule follows the app's live
   working indicator — inline next to “Working” when it is shown, otherwise in the 86 px tail lane at the bottom
   of the timeline. It starts at zero and updates live, then moves under the turn when the turn settles.
@@ -161,6 +162,7 @@ Options go in the plugin entry of `opencode.json(c)`:
         "compact": false,
         "detailed": false,
         "showCost": true,
+        "popoverSide": "left",
         "animate": true,
         "refreshMode": "continuous", // default; set "interval" for the two options below
         "sampleMs": 100,
@@ -180,6 +182,7 @@ Options go in the plugin entry of `opencode.json(c)`:
 | `compact` | `false` | Show only input, output, total and cost. |
 | `detailed` | `false` | Also show reasoning tokens and cache writes on the visible line. |
 | `showCost` | `true` | Show the per-turn cost. |
+| `popoverSide` | `"left"` | Side for the details card: `"left"` or `"right"`. The chosen side is tried first; if it does not fit, the card falls back below, then above. It never switches to the other side. |
 | `animate` | `true` | Animate the numbers. Set `false` to snap in both modes. |
 | `refreshMode` | `"continuous"` | `"continuous"` (fluid counter) or `"interval"` (discrete refresh + tween). |
 | `sampleMs` | `100` | Continuous mode: data sample interval while the session is running, clamped to 50–1000 ms. Idle sessions sample at 1000 ms. |
@@ -201,6 +204,13 @@ A local directory works the same way:
   ]
 }
 ```
+
+### Card side
+
+The details card opens to the left of the footer by default. Set `"popoverSide": "right"` to prefer the right gutter.
+
+The chosen side is tried first. On a narrow window where it does not fit, the card falls back below the footer, then
+above it; it does not switch to the opposite side. This keeps the configured direction predictable.
 
 ### Currency and exchange rate
 
@@ -302,8 +312,8 @@ user message
    app's `[data-component="session-working"]` row inline when it is rendered, otherwise it falls back to the
    `[data-timeline-row="bottom-spacer"]` tail lane, starting at zero and updating live; when the turn
    settles it moves into the assistant content. Hovering opens a card rendered into a fixed body portal at
-   z-index 2147483000, preferring the right gutter, then below, then above. The timer pauses while the window is
-   hidden.
+   z-index 2147483000, preferring the configured side (left by default), then below, then above. The timer pauses
+   while the window is hidden.
 
 There is no official message-footer slot in the GUI plugin API, so the last step is DOM injection. That is the
 intentionally fragile part: if a future OpenCode release renames the slot, the footer disappears (the plugin logs
@@ -345,6 +355,10 @@ Yes: set `"currency": "USD"`. The card still shows the original USD amount when 
 **How do I keep the card open?**
 Click the small info button at the end of the footer. The pinned card is selectable, so you can copy numbers; click
 the button again, press Escape, or click outside to close it.
+
+**Can I choose which side the card opens on?**
+Yes: set `"popoverSide": "left"` (default) or `"popoverSide": "right"`. The chosen side is tried first, then below,
+then above; it does not switch to the other side.
 
 **Why is the card never cut off by later messages?**
 It is rendered into a fixed portal on `document.body` at the maximum z-index, not inside the scrolling timeline

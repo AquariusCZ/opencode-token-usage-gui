@@ -69,6 +69,10 @@ function normalizeCurrency(value, locale) {
   return "CNY"
 }
 
+function normalizePopoverSide(value) {
+  return String(value || "left").toLowerCase() === "right" ? "right" : "left"
+}
+
 function emptyTotals() {
   return {
     input: 0,
@@ -284,6 +288,7 @@ module.exports = {
   formatMoney,
   formatPercent,
   normalizeCurrency,
+  normalizePopoverSide,
   normalizeRefreshMode,
   sameTotals,
   smoothingAlpha,

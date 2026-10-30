@@ -189,6 +189,10 @@ const CSS = `
   transform: translateX(-4px) scale(0.985);
   transform-origin: left center;
 }
+.tu-portal .tu-pop[data-placement="left"] {
+  transform: translateX(4px) scale(0.985);
+  transform-origin: right center;
+}
 .tu-portal .tu-pop[data-open="true"] {
   opacity: 1;
   visibility: visible;
@@ -691,6 +695,7 @@ function bindTooltip(entry, view) {
       bounds: area,
       gap: 8,
       pad: 8,
+      side: view.popoverSide,
     })
     portal.style.left = `${Math.round(result.left - 8)}px`
     portal.style.top = `${Math.round(result.top - 8)}px`

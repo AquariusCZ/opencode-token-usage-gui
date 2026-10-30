@@ -51,6 +51,9 @@ var require_core = __commonJS({
       }
       return "CNY";
     }
+    function normalizePopoverSide2(value) {
+      return String(value || "left").toLowerCase() === "right" ? "right" : "left";
+    }
     function emptyTotals() {
       return {
         input: 0,
@@ -221,6 +224,7 @@ var require_core = __commonJS({
       formatMoney: formatMoney2,
       formatPercent,
       normalizeCurrency: normalizeCurrency2,
+      normalizePopoverSide: normalizePopoverSide2,
       normalizeRefreshMode: normalizeRefreshMode2,
       sameTotals: sameTotals2,
       smoothingAlpha: smoothingAlpha2,
@@ -245,6 +249,7 @@ var require_placement = __commonJS({
       const bounds = input && input.bounds || {};
       const gap = Number.isFinite(input && input.gap) ? input.gap : 8;
       const pad = Number.isFinite(input && input.pad) ? input.pad : 8;
+      const side = input && String(input.side).toLowerCase() === "right" ? "right" : "left";
       const anchorTop = Number.isFinite(anchor.top) ? anchor.top : 0;
       const anchorBottom = Number.isFinite(anchor.bottom) ? anchor.bottom : anchorTop;
       const anchorLeft = Number.isFinite(anchor.left) ? anchor.left : 0;
@@ -255,16 +260,18 @@ var require_placement = __commonJS({
       const bottom = Number.isFinite(bounds.bottom) ? bounds.bottom : top;
       const left = Number.isFinite(bounds.left) ? bounds.left : 0;
       const right = Number.isFinite(bounds.right) ? bounds.right : left;
+      const roomLeft = anchorLeft - gap - popWidth - (left + pad);
       const roomRight = right - pad - (anchorRight + gap) - popWidth;
       const roomBelow = bottom - pad - (anchorBottom + gap) - popHeight;
       const roomAbove = anchorTop - gap - popHeight - (top + pad);
-      let placement = "right";
-      if (roomRight >= 0) placement = "right";
+      const sideRoom = side === "left" ? roomLeft : roomRight;
+      let placement;
+      if (sideRoom >= 0) placement = side;
       else if (roomBelow >= 0) placement = "bottom";
       else if (roomAbove >= 0) placement = "top";
       else {
         const rooms = [
-          ["right", roomRight],
+          [side, sideRoom],
           ["bottom", roomBelow],
           ["top", roomAbove]
         ];
@@ -272,7 +279,10 @@ var require_placement = __commonJS({
       }
       let resolvedLeft;
       let resolvedTop;
-      if (placement === "right") {
+      if (placement === "left") {
+        resolvedLeft = clamp(anchorLeft - gap - popWidth, left + pad, right - pad - popWidth);
+        resolvedTop = clamp(anchorTop, top + pad, bottom - pad - popHeight);
+      } else if (placement === "right") {
         resolvedLeft = clamp(anchorRight + gap, left + pad, right - pad - popWidth);
         resolvedTop = clamp(anchorTop, top + pad, bottom - pad - popHeight);
       } else {
@@ -474,6 +484,10 @@ var require_footer = __commonJS({
 .tu-portal .tu-pop[data-placement="right"] {
   transform: translateX(-4px) scale(0.985);
   transform-origin: left center;
+}
+.tu-portal .tu-pop[data-placement="left"] {
+  transform: translateX(4px) scale(0.985);
+  transform-origin: right center;
 }
 .tu-portal .tu-pop[data-open="true"] {
   opacity: 1;
@@ -931,7 +945,8 @@ var require_footer = __commonJS({
           pop: { width: pop.offsetWidth, height: pop.offsetHeight },
           bounds: area2,
           gap: 8,
-          pad: 8
+          pad: 8,
+          side: view.popoverSide
         });
         portal.style.left = `${Math.round(result.left - 8)}px`;
         portal.style.top = `${Math.round(result.top - 8)}px`;
@@ -1109,6 +1124,7 @@ var {
   finite,
   formatMoney,
   normalizeCurrency,
+  normalizePopoverSide,
   normalizeRefreshMode,
   sameTotals,
   smoothingAlpha
@@ -1322,6 +1338,7 @@ module.exports = Plugin.define({
     const smoothMs = clampNumber(options.smoothMs, MIN_SMOOTH_MS, MAX_SMOOTH_MS, DEFAULT_SMOOTH_MS);
     const animate = options.animate !== false && !reducedMotion() && (continuous || tweenMs > 0);
     const currency = normalizeCurrency(options.currency, locale);
+    const popoverSide = normalizePopoverSide(options.popoverSide);
     const autoRate = String(options.usdToCny).toLowerCase() === "auto";
     const manualRate = finite(options.usdToCny) > 0 ? finite(options.usdToCny) : DEFAULT_USD_TO_CNY;
     const rate = { value: manualRate, at: 0, source: "manual" };
@@ -1339,6 +1356,7 @@ module.exports = Plugin.define({
       showCost,
       continuous,
       currency,
+      popoverSide,
       money: (usd) => formatMoney(
         finite(usd) * (currency === "CNY" ? rate.value : 1),
         currency,

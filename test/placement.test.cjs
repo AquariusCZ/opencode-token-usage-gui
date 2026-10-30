@@ -7,11 +7,24 @@ const { placeTooltip } = require("../src/placement.cjs")
 
 const bounds = { top: 0, bottom: 800, left: 0, right: 1600 }
 
-test("the card prefers the free gutter to the right of the footer", () => {
+test("the card defaults to the left gutter of the footer", () => {
   const result = placeTooltip({
-    anchor: { top: 500, bottom: 530, left: 120, right: 720 },
+    anchor: { top: 500, bottom: 530, left: 500, right: 720 },
     pop: { width: 348, height: 220 },
     bounds,
+  })
+
+  assert.equal(result.placement, "left")
+  assert.equal(result.left, 144)
+  assert.equal(result.top, 500)
+})
+
+test("popoverSide right keeps the card in the right gutter when it fits", () => {
+  const result = placeTooltip({
+    anchor: { top: 500, bottom: 530, left: 500, right: 720 },
+    pop: { width: 348, height: 220 },
+    bounds,
+    side: "right",
   })
 
   assert.equal(result.placement, "right")
@@ -19,19 +32,32 @@ test("the card prefers the free gutter to the right of the footer", () => {
   assert.equal(result.top, 500)
 })
 
-test("the card falls below when the right gutter is too narrow", () => {
+test("a left-placed card falls below instead of switching to the right", () => {
   const result = placeTooltip({
-    anchor: { top: 40, bottom: 70, left: 120, right: 720 },
+    anchor: { top: 400, bottom: 430, left: 100, right: 500 },
     pop: { width: 348, height: 220 },
-    bounds: { top: 0, bottom: 800, left: 0, right: 800 },
+    bounds,
   })
 
   assert.equal(result.placement, "bottom")
-  assert.equal(result.top, 78)
-  assert.equal(result.left, 120)
+  assert.equal(result.top, 438)
+  assert.equal(result.left, 100)
 })
 
-test("the card falls above when the right gutter and the space below do not fit", () => {
+test("a right-placed card falls below instead of switching to the left", () => {
+  const result = placeTooltip({
+    anchor: { top: 400, bottom: 430, left: 1200, right: 1500 },
+    pop: { width: 348, height: 220 },
+    bounds,
+    side: "right",
+  })
+
+  assert.equal(result.placement, "bottom")
+  assert.equal(result.top, 438)
+  assert.equal(result.left, 1200)
+})
+
+test("the card falls above when the chosen side and the space below do not fit", () => {
   const result = placeTooltip({
     anchor: { top: 500, bottom: 530, left: 120, right: 400 },
     pop: { width: 348, height: 220 },
@@ -43,27 +69,16 @@ test("the card falls above when the right gutter and the space below do not fit"
   assert.equal(result.left, 120)
 })
 
-test("a right-placed card is clamped vertically near the bottom", () => {
+test("a left-placed card is clamped vertically near the bottom", () => {
   const result = placeTooltip({
-    anchor: { top: 700, bottom: 730, left: 120, right: 720 },
+    anchor: { top: 700, bottom: 730, left: 500, right: 720 },
     pop: { width: 348, height: 220 },
     bounds: { top: 0, bottom: 800, left: 0, right: 2000 },
   })
 
-  assert.equal(result.placement, "right")
-  assert.equal(result.left, 728)
+  assert.equal(result.placement, "left")
+  assert.equal(result.left, 144)
   assert.equal(result.top, 572)
-})
-
-test("a narrow viewport keeps the card inside the right edge", () => {
-  const result = placeTooltip({
-    anchor: { top: 300, bottom: 330, left: 300, right: 380 },
-    pop: { width: 348, height: 220 },
-    bounds: { top: 0, bottom: 800, left: 0, right: 420 },
-  })
-
-  assert.ok(result.left + 348 <= 420 - 8)
-  assert.ok(result.left >= 8)
 })
 
 test("malformed input still degrades to the safe edge instead of NaN", () => {
@@ -71,5 +86,5 @@ test("malformed input still degrades to the safe edge instead of NaN", () => {
 
   assert.equal(result.left, 8)
   assert.equal(result.top, 8)
-  assert.equal(result.placement, "right")
+  assert.equal(result.placement, "left")
 })
