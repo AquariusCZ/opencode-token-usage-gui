@@ -1,5 +1,7 @@
 # v0.3.0 — per-turn token, cache and cost capsules for OpenCode Desktop V2
 
+> Superseded by [v0.3.1](release-0.3.1.md): the dock now always shows the session summary, and per-turn capsules stay in the transcript.
+
 OpenCode Desktop shows the latest request and the session total. It does not show what **this turn** cost.
 This release adds the missing line — and a readable card behind it.
 

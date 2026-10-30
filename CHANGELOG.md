@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.3.1 — 2026-10-30
+
+- **The composer dock is now always the session summary.** One "Session" capsule above the input shows the
+  session ledger total while a turn runs, while the session is idle, and while messages are queued. It is no longer
+  replaced by a live "This turn" capsule.
+- **Per-turn capsules stay under their turn.** The active turn's capsule updates in place in the transcript; a
+  queued or steered prompt never creates a zero-value capsule.
+- **Turns follow the app's idle markers.** Steers and delivered queued prompts belong to the running turn;
+  synthetic/system/compaction notices never start one. Transcripts without idle markers (older sessions) fall back
+  to user-message boundaries, so their turn history is preserved.
+- **Steer rows track the turn.** Rows whose `data-message-id` is the delivered steer id now resolve to the turn, so
+  the capsule follows the live end of the turn.
+- **First-step summary.** The summary keeps the transcript totals until the session ledger reports tokens, so it no
+  longer disappears on the first step.
+- **Grammar.** "1 turn" instead of "1 turns".
+- **45 tests.**
+
 ## 0.3.0 — 2026-10-30
 
 - **Session summary at the end.** When a session is idle with no pending/queued message, the composer dock shows a

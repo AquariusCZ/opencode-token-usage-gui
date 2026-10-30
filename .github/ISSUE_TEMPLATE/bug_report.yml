@@ -30,7 +30,7 @@ body:
     attributes:
       label: Plugin version or commit
       description: The version shown in the footer/README, or the commit installed from GitHub.
-      placeholder: "0.3.0 / 9dfb763"
+      placeholder: "0.3.1"
     validations:
       required: true
 

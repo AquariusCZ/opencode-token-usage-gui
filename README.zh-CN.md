@@ -73,9 +73,8 @@ opencode plugin add github:AquariusCZ/opencode-token-usage-gui
   请求次数、耗时和汇率来源。未钉住时卡片也能直接悬停（中间有看不见的 8px 悬停桥），点 ⓘ 可钉住卡片
   持续阅读/复制。卡片优先放在配置方向（默认左侧）的空白处，其次下方，最后上方；窗口够宽时不会覆盖本轮的 step 行，
   并自动夹在浏览器窗口可视区域内，滚动/缩放时跟随。
-- **执行中也有胶囊。** 思考或工具执行时，胶囊位于 composer dock 中、排队消息面板和输入卡片上方；从 0 实时更新，
-  结束后归位到回复下方。已完成轮次保留各自胶囊。
-- **任务完成后汇总。** 会话空闲且没有 pending / 排队消息时，输入框上方切换为「本次会话」胶囊；token 和费用总量来自应用的会话账本（`session.get().tokens` 加 `session.cost()`，包含标题/压缩，API 可用时还包含子会话），是整段会话的终身计费总量，而不是已加载消息窗口的累加。行内显示 token 总量、费用和缓存命中，悬停展开的明细卡再补充请求数和活跃时间；轮数、请求数、活跃时间仍按已加载的对话统计，存在更早分页时标注「已加载」。下一轮开始后切换回实时胶囊。
+- **每轮一个胶囊，就地实时更新。** 每条回复下面渲染该轮的胶囊，思考或运行工具时原地更新；已完成的轮次保留。第一次有用量时才出现——排队或引导消息不会生成 0 值的「本轮」行。
+- **输入框上方永远是会话胶囊。** 会话一旦有用量，composer dock 就显示一个「本次会话」胶囊，运行中、空闲、排队时都在。token 和费用总量来自应用账本——`session.get().tokens` 加 `session.cost()`，包含标题/压缩，API 可用时还包含子会话——是整段会话的终身计费总量，而不是已加载消息窗口的累加。行内显示 token 总量、费用和缓存命中；悬停展开会话明细，补充请求数和活跃时间。轮数、请求数、活跃时间按已加载的对话统计，存在更早分页时标注「已加载」。dock 不会切换成逐轮胶囊，两种胶囊各自独立。
 - **位于应用普通层叠之上。** 明细卡渲染到 `document.body` 的 fixed portal，z-index 为 2147483000，位于时间线、
   后续消息和输入区之上，普通层叠上下文无法遮住或裁掉它。应用自身的 modal/对话框仍可能盖在它上面。
 - **更容易对准。** 可见行本身是一块带内边距的胶囊，行尾有独立 ⓘ 按钮，点击热区比图标更大，不用再
@@ -127,7 +126,7 @@ OpenCode 会自动发现 `~/.config/opencode/plugins/` 下的插件目录。如�
 
 ### 确认安装成功
 
-1. 每一轮完成后，回复下方出现 footer；生成中的那一轮，胶囊显示在输入框上方。
+1. 每条回复下方出现胶囊，生成中原地更新；输入框上方始终显示一个「本次会话」汇总。
 2. **设置 → 扩展 → 插件** 里有 `token-usage-gui`，开关是开的。
 3. `opencode plugin list` 能看到 `token-usage-gui`。
 4. 有问题就看 `~/.local/share/opencode/log/opencode.log` 里有没有 `token-usage-gui`。
@@ -262,7 +261,7 @@ opencode plugin remove opencode-token-usage-gui
 input + output + reasoning + cache.read + cache.write
 ```
 
-- **一轮**：从一条 user 或 synthetic 消息开始，到下一条 user/synthetic 之前，包含中间所有 assistant 请求。
+- **一轮**：由应用的 idle 标记分界：一次执行的第一条用户 prompt 开始，到下一个 idle 标记结束。这一轮中途引导或排队的 prompt 属于本轮；synthetic/system/compaction 通知不会开启新一轮。早于 idle 标记的旧会话回退到用户消息边界。
 - **缓存命中率**：`cache.read / (input + cache.read + cache.write)`，表示 prompt 里有多大比例来自缓存。
 - **费用**：来自应用上报的每请求 `message.cost`（美元）。人民币只是显示换算，不是第二套计费。
 - **请求次数**：有 usage 记录的 assistant 消息数，不是工具调用次数。
@@ -286,11 +285,11 @@ user message
 ```
 
 1. 从应用的客户端 store 读取当前会话的消息列表；
-2. 按前面的 user/synthetic 消息把 assistant 消息分组，累加 `tokens` 和 `cost`；
+2. 按轮分组 assistant 消息——当前会话按 idle 分界，旧对话按用户消息分界——并累加 `tokens` 和 `cost`；
 3. 找到渲染出来的 assistant 内容容器（`[data-slot="session-turn-assistant-content"]`），把 footer 节点挂进去；
 4. 100ms 采样（空闲 1000ms）保持数据新鲜；`MutationObserver` 在应用重渲染时把 footer 挂回去；`requestAnimationFrame` 做数字动画；
-5. 应用把 `session.status` 报为 `running`（思考或工具执行）时，当前轮的 footer 成为 `[data-component="session-composer-dock"]` 里 `z-[70]` 列的**第一个流式子元素**，位于排队消息区（queue grow）和 `[data-slot="composer-morph"]` **上方**：排队面板的 12px 负外边距只会压到输入卡片上，不会压到胶囊；dock 的 ResizeObserver 会同步时间线下边距；morph 的面板飞行动画（`data-moving` + `overflow-clip`）裁不到 morph 之外的节点。从 0 开始实时更新，本轮结束后归位到回复内容下方。明细卡是 `document.body` 级的 fixed portal（z-index 2147483000），优先配置方向（默认左侧），其次下方，最后上方；窗口隐藏时暂停采样。
-6. 会话空闲且没有 pending / 排队消息时，dock 显示合成的「本次会话」footer。token 和费用总量来自应用的会话账本：`session.get(id).tokens` 和 `session.cost(id)`（根会话按 family 聚合，子会话只取自身），按会话及其 family 逐个累加；账本包含标题/压缩、被 revert 的用量（revert 不退费）和子会话用量，所以这是整段会话的终身计费总量，可能大于各轮 footer 之和。轮数、请求数和活跃时间仍由 `summarizeTurns(turns)` 按已加载的对话统计，`message.more(id)` 报告还有更早分页时标注「已加载」；全程不调用 `message.sync`/`loadMore`，读汇总不会改动对话或滚动位置。「空闲」以客户端 store 的 pending 列表为准，队列面板关着也不会误显示；另有第二个 `MutationObserver` 观察当前面板的 composer dock，队列行出现或消失会在 120ms 防抖内刷新，而不是等 1s 空闲采样。下一轮开始后由实时胶囊替换。
+5. 每轮的 footer 追加到该轮 assistant 内容里，应用把 `session.status` 报为 `running` 时原地更新，永远不会移进 composer dock。悬停打开固定的 body-portal 明细卡（z-index 2147483000），优先配置方向（默认左侧），其次下方，最后上方；窗口隐藏时暂停采样。
+6. 只要会话有用量，composer dock 就始终显示一个合成的「本次会话」footer——每个会话一个。token 和费用总量来自应用的会话账本：`session.get(id).tokens` 和 `session.cost(id)`（根会话按 family 聚合，子会话只取自身），按会话及其 family 逐个累加；账本包含标题/压缩、被 revert 的用量（revert 不退费）和子会话用量，所以这是整段会话的终身计费总量，可能大于各轮 footer 之和。轮数、请求数和活跃时间仍由 `summarizeTurns(turns)` 按已加载的对话统计，`message.more(id)` 报告还有更早分页时标注「已加载」；全程不调用 `message.sync`/`loadMore`，读汇总不会改动对话或滚动位置。第一次有用量之前没有 0 值占位，汇总也不会被逐轮胶囊替换。
 
 GUI 插件 API 目前没有官方的「消息底部插槽」，所以最后一步是 DOM 注入。这是整个插件最脆的地方：未来
 OpenCode 如果改了 slot 名，footer 会消失（插件只打印一次警告），不会污染时间线。选择器和聚合逻辑分别隔离在
@@ -321,7 +320,7 @@ OpenCode 如果改了 slot 名，footer 会消失（插件只打印一次警告�
 一轮里可能有很多 assistant 请求和工具循环；按单条消息显示会漏掉大部分消耗。想要更多指标可以开 `detailed`。
 
 **整个会话的总量在哪看？**
-会话空闲且没有排队消息时，输入框上方的「本次会话」胶囊读取应用的会话账本，token 和费用包含标题/压缩（以及子会话）用量，不只是可见的对话；悬停可看会话明细。轮数/请求数/活跃时间按已加载的对话统计，存在更早分页时会标注「已加载」。各轮胶囊仍保留在对话里。
+输入框上方始终显示。「本次会话」胶囊就是会话账本总量；对话里的逐轮胶囊展示归因。
 
 **能看到推理 token 吗？**
 可以：`detailed: true`，或者直接打开明细卡。推理 token 永远在卡片里。

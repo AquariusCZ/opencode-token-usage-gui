@@ -25,16 +25,16 @@ Operating rules that follow from this:
 
 ### One-liner
 
-> Per-turn token, cache and cost capsules for every OpenCode Desktop V2 reply.
+> Per-turn token, cache and cost capsules for every OpenCode Desktop V2 reply, plus an always-on session total in the composer dock.
 
 ### 30-second pitch
 
 OpenCode Desktop tells you how big the context is and what the session has cost so far. It does not tell you what
 the reply you are looking at actually cost. This plugin adds one compact line under each turn: input, output, cache
-reads, cache hit rate, total tokens and RMB cost. While the model is thinking or running tools, a live capsule sits
-in the composer dock; when the session goes idle with nothing queued, it becomes a session-wide summary. Hover for a
-theme-native card with a composition bar, six metrics, request count and active time. One `opencode plugin add`
-command, zero runtime dependencies, no network by default.
+reads, cache hit rate, total tokens and RMB cost. Each turn's capsule stays under its reply and updates live while
+the model is thinking or running tools; the composer dock always shows the session summary. A queued or steered
+prompt never creates a zero capsule. Hover for a theme-native card with a composition bar, six metrics, request
+count and active time. One `opencode plugin add` command, zero runtime dependencies, no network by default.
 
 ### Three audience angles
 
@@ -55,17 +55,18 @@ distinction between "sum of the transcript" and "what the session was billed", i
 
 Do these in order. Posting before the release page matches the code is the most common way to waste a launch.
 
-- [ ] **Push `main`.** The local branch is ahead of `origin/main`; the newest public release is still v0.2.2.
-- [ ] **Tag and release v0.3.0.** Use `docs/release-0.3.0.md` as the release body. Attach nothing unless there is a
+- [x] **Push `main`.** v0.3.0 is public on GitHub; the repo and README are the product page.
+- [x] **Tag and release v0.3.0.** Public, with the install path on GitHub.
+- [ ] **Tag and release v0.3.1.** Use `docs/release-0.3.1.md` as the release body. Attach nothing unless there is a
       real artifact; the install path is GitHub.
-- [ ] **Leave npm alone.** `opencode-token-usage-gui` on npm is a `0.0.0-stage` placeholder. Do not advertise
-      `npm install`, and do not publish 0.3.0 to npm as part of the launch.
+- [x] **Leave npm alone.** `opencode-token-usage-gui` on npm is a `0.0.0-stage` placeholder. Do not advertise
+      `npm install`, and do not publish to npm as part of the launch.
 - [ ] **Real screenshot or GIF.** `assets/screenshot-en.png` is an explicitly labeled illustrative mock. Record a
       real session on OpenCode Desktop 2.2.3 and replace the hero image, or add the real capture beside the mock.
       This is the single highest-value pre-launch task.
-- [ ] **Enable GitHub Discussions.** Settings → General → Features → Discussions. Create a "Show and tell" category
+- [x] **Enable GitHub Discussions.** Settings → General → Features → Discussions. Create a "Show and tell" category
       if it does not exist.
-- [ ] **Upload the social preview.** Settings → General → Social preview → upload `assets/social-preview.png`
+- [x] **Upload the social preview.** Settings → General → Social preview → upload `assets/social-preview.png`
       (1280×640).
 - [ ] **Confirm issue templates render.** Open `/issues/new/choose` and check the two forms and the contact link.
 - [ ] **Re-read the README top.** It should state the V2 requirement, the install command and the mock disclaimer
@@ -73,7 +74,7 @@ Do these in order. Posting before the release page matches the code is the most 
 
 ## 4. Channel plan
 
-Times are relative to T0, the moment the v0.3.0 release page is live. Do not compress the whole list into one day;
+Times are relative to T0, the moment the v0.3.1 release page is live. Do not compress the whole list into one day;
 each channel benefits from the previous one existing.
 
 | Order | Channel | Timing | Why | Effort |
@@ -104,10 +105,10 @@ everywhere.
 Title:
 
 ```text
-v0.3.0 — per-turn token, cache and cost capsules for OpenCode Desktop V2
+v0.3.1 — one session summary in the dock, per-turn capsules in the transcript
 ```
 
-Body: use `docs/release-0.3.0.md` verbatim.
+Body: use `docs/release-0.3.1.md` verbatim.
 
 ### 5.2 awesome-opencode PR
 
@@ -151,8 +152,8 @@ Body:
 Adds a community GUI plugin for OpenCode Desktop V2 to the ecosystem plugin table.
 
 - Repo: https://github.com/AquariusCZ/opencode-token-usage-gui
-- What it does: one capsule per turn with input/output tokens, cache reads and hit rate, total tokens and RMB cost;
-  a live capsule while the model is thinking or running tools; a session-wide summary when the session is idle.
+- What it does: one capsule per turn in the transcript with input/output tokens, cache reads and hit rate, total
+  tokens and RMB cost; the composer dock always shows the session-wide summary, running or queued.
 - Install: `opencode plugin add github:AquariusCZ/opencode-token-usage-gui`
 - License: MIT
 
@@ -175,8 +176,8 @@ I built a small GUI plugin for OpenCode Desktop V2: per-turn token, cache and co
 
 The desktop app shows the latest request and the session total, but not what the turn you're reading actually cost.
 This adds one line under each turn — input/output, cache reads, cache hit rate, total tokens, RMB cost — with a
-details card on hover. While the model is thinking or running tools, a live capsule sits above the composer; when
-the session is idle with nothing queued, it turns into a session-wide summary.
+details card on hover. Each turn's capsule stays under its reply and updates live; the composer dock always shows
+the session total, running or queued.
 
 Install:
 opencode plugin add github:AquariusCZ/opencode-token-usage-gui
@@ -198,8 +199,8 @@ Use `https://www.opencode.cafe/submit`. If a field is not on the form, skip it r
 - **Repo / URL:** https://github.com/AquariusCZ/opencode-token-usage-gui
 - **Tagline:** Per-turn token, cache-hit and RMB cost capsules for every OpenCode Desktop V2 reply.
 - **Description:** A zero-config GUI plugin for OpenCode Desktop V2. One capsule per turn shows input/output, cache
-  reads and hit rate, total tokens and RMB cost. A live capsule follows thinking and tool work in the composer dock;
-  a session-wide summary appears when the session is idle with no pending work. Hover for a theme-native breakdown
+  reads and hit rate, total tokens and RMB cost. Each turn's capsule stays under its reply and updates live; the
+  composer dock always shows the session total, running or queued. Hover for a theme-native breakdown
   card with a composition bar, six metrics, requests, active time and exchange-rate source. Configurable left/right
   popover, compact/detailed modes, zero runtime dependencies, no network unless the optional auto FX rate is enabled.
 - **Install:** `opencode plugin add github:AquariusCZ/opencode-token-usage-gui`
@@ -223,9 +224,9 @@ I wanted to know what the reply in front of me cost, not just how large the cont
 OpenCode Desktop V2.
 
 What it shows:
-- One capsule per turn: input, output, cache reads, cache hit rate, total tokens, RMB cost.
-- A live capsule in the composer dock while the model is thinking or running tools.
-- A session-wide summary when the session is idle and nothing is pending or queued. Totals come from the app's
+- One capsule per turn: input, output, cache reads, cache hit rate, total tokens, RMB cost. It stays under its
+  reply and updates live while the turn runs; a queued or steered prompt never creates a zero capsule.
+- A session-wide summary that is always in the composer dock, running or queued. Totals come from the app's
   session ledger, so they include compaction/title usage and, where available, subagents.
 - A theme-native details card on hover or pin: composition bar, six metrics, request count, active time, FX source.
 - `popoverSide` ("left" default, "right"), compact/detailed modes, bilingual UI.
@@ -254,7 +255,7 @@ Title option: `给 OpenCode Desktop 写了个小插件：看每轮对话花了�
 ```text
 用 OpenCode Desktop 的时候，上下文面板只告诉我现在窗口有多大、这个会话一共花了多少，但我真正想知道的是「眼前这轮回复花了多少」。尤其是 DeepSeek、Anthropic 这种缓存命中影响很大的模型，缓存读和命中率不显示，账单看起来就很没头绪。
 
-所以我写了个 GUI 插件，在每轮回复下面加一行：输入、输出、缓存读、缓存命中率、总 token、人民币花费。模型思考或跑工具的时候，输入框上方会有一条实时胶囊；会话空闲、没有排队消息时，它会变成整个会话的汇总。鼠标悬停能看一张跟随主题的明细卡，有构成条、六项指标、请求数、耗时和汇率来源。卡片可以固定在左边或右边，也能切紧凑/详细模式。
+所以我写了个 GUI 插件，在每轮回复下面加一行：输入、输出、缓存读、缓存命中率、总 token、人民币花费。每条回复下面的胶囊会随着这一轮实时更新；输入框上方始终显示整个会话的总量，运行中、排队时都在。鼠标悬停能看一张跟随主题的明细卡，有构成条、六项指标、请求数、耗时和汇率来源。卡片可以固定在左边或右边，也能切紧凑/详细模式。
 
 安装只要一条命令，然后重载：
 
@@ -303,8 +304,8 @@ Happy to answer questions about the V2 plugin API or the injection approach.
 ```text
 OpenCode Desktop shows the session total, not what this turn cost.
 
-Built a GUI plugin: per-turn tokens, cache hit rate and RMB cost, live capsules while tools run, and a session
-summary when idle. MIT, zero deps.
+Built a GUI plugin: per-turn tokens, cache hit rate and RMB cost. Each turn's capsule stays under its reply and
+updates live; the dock always shows the session total. MIT, zero deps.
 
 opencode plugin add github:AquariusCZ/opencode-token-usage-gui
 ```
@@ -330,8 +331,8 @@ Attach the real screenshot. Do not thread more than two posts.
 
 Two hours before:
 
-- [ ] `git status` clean, `main` pushed, tag `v0.3.0` created and pushed.
-- [ ] Release page published with the body from `docs/release-0.3.0.md`.
+- [ ] `git status` clean, `main` pushed, tag `v0.3.1` created and pushed.
+- [ ] Release page published with the body from `docs/release-0.3.1.md`.
 - [ ] README hero image loads on a logged-out browser (no cache).
 - [ ] Install command tested from a clean profile: `opencode plugin add github:...`, reload, capsule appears.
 - [ ] Issue templates render; contact link opens Discord.

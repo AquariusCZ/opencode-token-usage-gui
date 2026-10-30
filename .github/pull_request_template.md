@@ -4,7 +4,7 @@
 
 ## Test
 
-- [ ] `npm run check` passes (build + 35 tests)
+- [ ] `npm run check` passes (build + 45 tests)
 - [ ] `dist/gui-experimental.cjs` is rebuilt and committed if `src/` changed
 
 ## UI changes
