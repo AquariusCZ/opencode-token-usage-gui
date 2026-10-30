@@ -36,9 +36,6 @@ const CSS = `
   -webkit-user-select: text;
   transition: background-color 140ms ease;
 }
-[${FOOTER_ATTR}][hidden] {
-  display: none !important;
-}
 [${FOOTER_ATTR}]:hover,
 [${FOOTER_ATTR}][data-open="true"] {
   background: var(--v2-overlay-simple-overlay-hover, rgba(127, 127, 127, 0.08));
@@ -56,6 +53,17 @@ const CSS = `
 }
 [${FOOTER_ATTR}][data-open]::after {
   bottom: -8px;
+}
+[${FOOTER_ATTR}][data-open][data-placement="right"]::before {
+  left: 100%;
+  right: auto;
+  top: -8px;
+  bottom: -8px;
+  width: 8px;
+  height: auto;
+}
+[${FOOTER_ATTR}][data-open][data-placement="right"]::after {
+  display: none;
 }
 [${FOOTER_ATTR}][data-pinned] {
   background: var(--v2-overlay-simple-overlay-pressed, rgba(127, 127, 127, 0.12));
@@ -187,6 +195,10 @@ const CSS = `
 [${FOOTER_ATTR}] .tu-pop[data-placement="bottom"] {
   transform: translateY(-4px) scale(0.985);
   transform-origin: top left;
+}
+[${FOOTER_ATTR}] .tu-pop[data-placement="right"] {
+  transform: translateX(-4px) scale(0.985);
+  transform-origin: left center;
 }
 [${FOOTER_ATTR}] .tu-pop[data-open="true"] {
   opacity: 1;
@@ -668,7 +680,7 @@ function bindTooltip(entry, view) {
 
     const anchor = root.getBoundingClientRect()
     const result = placeTooltip({
-      anchor: { top: anchor.top, bottom: anchor.bottom, left: anchor.left },
+      anchor: { top: anchor.top, bottom: anchor.bottom, left: anchor.left, right: anchor.right },
       pop: { width: pop.offsetWidth, height: pop.offsetHeight },
       bounds: area,
       gap: 8,
@@ -677,6 +689,7 @@ function bindTooltip(entry, view) {
     pop.style.left = `${Math.round(result.left - anchor.left)}px`
     pop.style.top = `${Math.round(result.top - anchor.top)}px`
     pop.dataset.placement = result.placement
+    root.dataset.placement = result.placement
   }
 
   const listen = () => {

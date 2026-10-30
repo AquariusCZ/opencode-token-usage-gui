@@ -67,13 +67,11 @@ numbers that actually change the bill.
 - **A details card that is actually readable.** Hover or focus the footer for a theme-aware card with a token
   composition bar, a six-cell metric grid, request count, wall time, and the exchange-rate source. The card stays
   open while your pointer is over it (an invisible bridge covers the gap) and can be pinned with the info button
-  for persistent reading and copying. It flips above/below and clamps to the timeline, and repositions on scroll
-  and resize.
+  for persistent reading and copying. It prefers the free gutter to the right of the footer, then below it, then
+  above, so it does not cover the turn's step rows on a wide window; it clamps to the timeline and repositions on
+  scroll and resize.
 - **A footer you can hit.** The visible line is a padded pill with a dedicated info button whose hit area extends
   past the glyph; no need to land on a single 12 px line.
-- **Quiet while the turn runs.** The active turn's footer is hidden while the app reports the turn as running and
-  reappears when it settles; previous turns keep theirs. Live status (thinking, tool progress) is the primary UI,
-  so the metadata neither covers it nor gets covered by it.
 - **Keyboard accessible.** Tab to the info button, press Enter or Space to pin, Escape or an outside click to close.
   `prefers-reduced-motion` disables the card transition.
 - **Live count-up.** Continuous mode samples the store at 100 ms while running and follows the target with a
@@ -294,10 +292,9 @@ user message
    a footer node.
 4. A 100 ms sampler (1000 ms when idle) keeps values fresh; a `MutationObserver` re-attaches the footer when the
    app re-renders the timeline; `requestAnimationFrame` animates changes.
-5. Hovering the footer opens a card built from the same DOM node. It prefers the space above the line, flips below
-   when needed, and is clamped to the timeline viewport. The timer pauses while the window is hidden. While the
-   app reports `session.status` as `running` (or marks the active assistant content `aria-hidden`), the active
-   turn's footer is hidden; it returns when the turn settles.
+5. Hovering the footer opens a card built from the same DOM node. It prefers the free space to the right of the
+   footer, then below, then above, and is clamped to the timeline viewport. The timer pauses while the window is
+   hidden.
 
 There is no official message-footer slot in the GUI plugin API, so the last step is DOM injection. That is the
 intentionally fragile part: if a future OpenCode release renames the slot, the footer disappears (the plugin logs
@@ -339,10 +336,6 @@ Yes: set `"currency": "USD"`. The card still shows the original USD amount when 
 **How do I keep the card open?**
 Click the small info button at the end of the footer. The pinned card is selectable, so you can copy numbers; click
 the button again, press Escape, or click outside to close it.
-
-**Why does the footer disappear while a turn is running?**
-The active turn's footer is intentionally hidden while the app's live status owns that area, then reappears when the
-turn completes. Completed turns keep their footers.
 
 **Why is the cost zero?**
 The provider did not report a cost for that request. Free models and some local providers do not report one.

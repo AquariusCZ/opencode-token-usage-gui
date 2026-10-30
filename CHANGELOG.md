@@ -7,16 +7,14 @@
 - **A target you can actually hit.** The footer is a padded pill (about 30 px tall) with a dedicated info button
   whose hit area extends past its glyph. The card stays open when the pointer moves onto it — an invisible 8 px
   bridge spans the gap — so it does not vanish while you aim at it.
-- **Quiet while the turn runs.** The active turn's footer is hidden while the session reports `running` (or the
-  app marks its assistant content `aria-hidden`) and returns when the turn settles. Previous turns keep their
-  footers, so the live status is never covered by metadata and the footer is never covered by it.
 - **Click to pin.** The info button pins the card; pinned text is selectable, and Escape, a second click, or a
   click outside closes it. Keyboard users get the same flow through Tab / Enter / Space.
 - **Readable at a glance.** The card adds a composition bar, a six-cell metric grid (input, output, reasoning,
   cache read, cache write, cache hit), request count, wall time, and the exchange-rate source. The visible footer
   stays compact.
-- **Placement that behaves.** The card prefers to sit above the footer, flips below when the timeline has no room,
-  clamps horizontally, and repositions on scroll and resize.
+- **Out of the way.** The card prefers the free gutter to the right of the footer, then below, then above, so it
+  does not sit on top of the turn's step rows when the window has room. It clamps to the timeline and repositions
+  on scroll and resize.
 - **Theme-native.** Background, borders, elevation, text and overlay colors come from the desktop's own v2 tokens,
   so light and dark mode both look native. `prefers-reduced-motion` is honored.
 - **Actually pauses when hidden.** The sample timer is now cleared while the window is hidden (the README already

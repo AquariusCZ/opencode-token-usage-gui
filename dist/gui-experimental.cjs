@@ -248,23 +248,38 @@ var require_placement = __commonJS({
       const anchorTop = Number.isFinite(anchor.top) ? anchor.top : 0;
       const anchorBottom = Number.isFinite(anchor.bottom) ? anchor.bottom : anchorTop;
       const anchorLeft = Number.isFinite(anchor.left) ? anchor.left : 0;
+      const anchorRight = Number.isFinite(anchor.right) ? anchor.right : anchorLeft;
       const popWidth = Math.max(0, Number(pop.width) || 0);
       const popHeight = Math.max(0, Number(pop.height) || 0);
       const top = Number.isFinite(bounds.top) ? bounds.top : 0;
       const bottom = Number.isFinite(bounds.bottom) ? bounds.bottom : top;
       const left = Number.isFinite(bounds.left) ? bounds.left : 0;
       const right = Number.isFinite(bounds.right) ? bounds.right : left;
-      const roomAbove = anchorTop - gap - popHeight - (top + pad);
+      const roomRight = right - pad - (anchorRight + gap) - popWidth;
       const roomBelow = bottom - pad - (anchorBottom + gap) - popHeight;
-      let placement = "top";
-      if (roomAbove >= 0) placement = "top";
+      const roomAbove = anchorTop - gap - popHeight - (top + pad);
+      let placement = "right";
+      if (roomRight >= 0) placement = "right";
       else if (roomBelow >= 0) placement = "bottom";
-      else placement = roomBelow > roomAbove ? "bottom" : "top";
-      const desiredTop = placement === "top" ? anchorTop - gap - popHeight : anchorBottom + gap;
-      const maxTop = bottom - pad - popHeight;
-      const resolvedTop = clamp(desiredTop, top + pad, maxTop);
-      const maxLeft = right - pad - popWidth;
-      const resolvedLeft = clamp(anchorLeft, left + pad, maxLeft);
+      else if (roomAbove >= 0) placement = "top";
+      else {
+        const rooms = [
+          ["right", roomRight],
+          ["bottom", roomBelow],
+          ["top", roomAbove]
+        ];
+        placement = rooms.reduce((best, item) => item[1] > best[1] ? item : best)[0];
+      }
+      let resolvedLeft;
+      let resolvedTop;
+      if (placement === "right") {
+        resolvedLeft = clamp(anchorRight + gap, left + pad, right - pad - popWidth);
+        resolvedTop = clamp(anchorTop, top + pad, bottom - pad - popHeight);
+      } else {
+        resolvedLeft = clamp(anchorLeft, left + pad, right - pad - popWidth);
+        const desiredTop = placement === "bottom" ? anchorBottom + gap : anchorTop - gap - popHeight;
+        resolvedTop = clamp(desiredTop, top + pad, bottom - pad - popHeight);
+      }
       return {
         left: Math.round(resolvedLeft),
         top: Math.round(resolvedTop),
@@ -307,9 +322,6 @@ var require_footer = __commonJS({
   -webkit-user-select: text;
   transition: background-color 140ms ease;
 }
-[${FOOTER_ATTR}][hidden] {
-  display: none !important;
-}
 [${FOOTER_ATTR}]:hover,
 [${FOOTER_ATTR}][data-open="true"] {
   background: var(--v2-overlay-simple-overlay-hover, rgba(127, 127, 127, 0.08));
@@ -327,6 +339,17 @@ var require_footer = __commonJS({
 }
 [${FOOTER_ATTR}][data-open]::after {
   bottom: -8px;
+}
+[${FOOTER_ATTR}][data-open][data-placement="right"]::before {
+  left: 100%;
+  right: auto;
+  top: -8px;
+  bottom: -8px;
+  width: 8px;
+  height: auto;
+}
+[${FOOTER_ATTR}][data-open][data-placement="right"]::after {
+  display: none;
 }
 [${FOOTER_ATTR}][data-pinned] {
   background: var(--v2-overlay-simple-overlay-pressed, rgba(127, 127, 127, 0.12));
@@ -458,6 +481,10 @@ var require_footer = __commonJS({
 [${FOOTER_ATTR}] .tu-pop[data-placement="bottom"] {
   transform: translateY(-4px) scale(0.985);
   transform-origin: top left;
+}
+[${FOOTER_ATTR}] .tu-pop[data-placement="right"] {
+  transform: translateX(-4px) scale(0.985);
+  transform-origin: left center;
 }
 [${FOOTER_ATTR}] .tu-pop[data-open="true"] {
   opacity: 1;
@@ -895,7 +922,7 @@ var require_footer = __commonJS({
         pop.style.maxHeight = `${Math.max(140, area2.bottom - area2.top - 16)}px`;
         const anchor = root.getBoundingClientRect();
         const result = placeTooltip({
-          anchor: { top: anchor.top, bottom: anchor.bottom, left: anchor.left },
+          anchor: { top: anchor.top, bottom: anchor.bottom, left: anchor.left, right: anchor.right },
           pop: { width: pop.offsetWidth, height: pop.offsetHeight },
           bounds: area2,
           gap: 8,
@@ -904,6 +931,7 @@ var require_footer = __commonJS({
         pop.style.left = `${Math.round(result.left - anchor.left)}px`;
         pop.style.top = `${Math.round(result.top - anchor.top)}px`;
         pop.dataset.placement = result.placement;
+        root.dataset.placement = result.placement;
       };
       const listen = () => {
         if (listening) return;
@@ -1349,12 +1377,7 @@ module.exports = Plugin.define({
       if (!observer || observedScroll === scroll) return;
       observer.disconnect();
       observedScroll = scroll;
-      observer.observe(scroll, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ["aria-hidden"]
-      });
+      observer.observe(scroll, { childList: true, subtree: true });
     };
     const tick = (now) => {
       if (continuous) {
@@ -1414,16 +1437,6 @@ module.exports = Plugin.define({
         const info = data.session.get && data.session.get(session.id);
         const turns = buildTurns(messages, info && info.revert && info.revert.messageID);
         if (turns.size === 0) return;
-        const statusApi = data.session && data.session.status;
-        let running = false;
-        if (typeof statusApi === "function") {
-          try {
-            running = statusApi.call(data.session, session.id) === "running";
-          } catch {
-          }
-        }
-        const turnIds = Array.from(turns.keys());
-        const activeTurnId = running ? turnIds[turnIds.length - 1] : null;
         const byMessage = /* @__PURE__ */ new Map();
         known = new Set(turns.keys());
         for (const [turnId, turn] of turns) {
@@ -1471,14 +1484,6 @@ module.exports = Plugin.define({
             target.appendChild(entry.root);
             entry.targetEl = target;
             if (entry.isOpen()) entry.reposition();
-          }
-          const working = target.getAttribute("aria-hidden") === "true" || running && turnId === activeTurnId;
-          if (working) {
-            if (entry.isOpen()) entry.close();
-            entry.root.hidden = true;
-          } else if (entry.root.hidden) {
-            entry.root.hidden = false;
-            paint(entry, view);
           }
         }
       } finally {

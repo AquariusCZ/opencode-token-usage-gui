@@ -537,6 +537,17 @@
       [data-token-usage][data-open]::after {
         bottom: -8px;
       }
+      [data-token-usage][data-open][data-placement="right"]::before {
+        left: 100%;
+        right: auto;
+        top: -8px;
+        bottom: -8px;
+        width: 8px;
+        height: auto;
+      }
+      [data-token-usage][data-open][data-placement="right"]::after {
+        display: none;
+      }
       [data-token-usage][data-pinned] {
         background: var(--v2-overlay-simple-overlay-pressed);
       }
@@ -660,6 +671,10 @@
       [data-token-usage] .tu-pop[data-placement="bottom"] {
         transform: translateY(-4px) scale(0.985);
         transform-origin: top left;
+      }
+      [data-token-usage] .tu-pop[data-placement="right"] {
+        transform: translateX(-4px) scale(0.985);
+        transform-origin: left center;
       }
       [data-token-usage] .tu-pop[data-open="true"] {
         opacity: 1;
@@ -976,12 +991,34 @@
         let showTimer
         let hideTimer
 
+        const clamp = (value, min, max) => (max > min ? Math.min(max, Math.max(min, value)) : min)
+
         const position = () => {
           const rootRect = root.getBoundingClientRect()
-          const top = rootRect.top - pop.offsetHeight - 8
-          pop.style.left = "0px"
-          pop.style.top = `${Math.round(top - rootRect.top)}px`
+          const popW = pop.offsetWidth
+          const popH = pop.offsetHeight
+          const pad = 8
+
+          if (rootRect.right + 8 + popW <= window.innerWidth - pad) {
+            pop.dataset.placement = "right"
+            root.dataset.placement = "right"
+            pop.style.left = `${rootRect.width + 8}px`
+            pop.style.top = `${Math.round(clamp(rootRect.top, pad, window.innerHeight - popH - pad) - rootRect.top)}px`
+            return
+          }
+
+          if (rootRect.bottom + 8 + popH <= window.innerHeight - pad) {
+            pop.dataset.placement = "bottom"
+            root.dataset.placement = "bottom"
+            pop.style.left = "0px"
+            pop.style.top = `${rootRect.height + 8}px`
+            return
+          }
+
           pop.dataset.placement = "top"
+          root.dataset.placement = "top"
+          pop.style.left = "0px"
+          pop.style.top = `${-popH - 8}px`
         }
 
         const show = () => {

@@ -3,9 +3,11 @@
 /**
  * Pure placement math for the details card.
  *
- * The card prefers to sit above the footer, flips below when the timeline has
- * no room above, and is clamped so it never leaves the visible timeline area.
- * Keeping this DOM-free makes the edge cases testable in Node.
+ * The card prefers the free gutter to the right of the footer, then the space
+ * below it, then the space above, and is clamped so it never leaves the
+ * visible timeline area. Sitting beside the footer keeps the card off the
+ * turn's step rows on a wide window. Keeping this DOM-free makes the edge
+ * cases testable in Node.
  */
 
 function clamp(value, min, max) {
@@ -15,12 +17,12 @@ function clamp(value, min, max) {
 
 /**
  * @param {object} input
- * @param {{top:number,bottom:number,left:number}} input.anchor footer rect
+ * @param {{top:number,bottom:number,left:number,right:number}} input.anchor footer rect
  * @param {{width:number,height:number}} input.pop card size
  * @param {{top:number,bottom:number,left:number,right:number}} input.bounds visible area
  * @param {number} [input.gap] space between footer and card
  * @param {number} [input.pad] minimum distance to the visible edges
- * @returns {{left:number, top:number, placement:"top"|"bottom"}}
+ * @returns {{left:number, top:number, placement:"right"|"bottom"|"top"}}
  */
 function placeTooltip(input) {
   const anchor = (input && input.anchor) || {}
@@ -32,6 +34,7 @@ function placeTooltip(input) {
   const anchorTop = Number.isFinite(anchor.top) ? anchor.top : 0
   const anchorBottom = Number.isFinite(anchor.bottom) ? anchor.bottom : anchorTop
   const anchorLeft = Number.isFinite(anchor.left) ? anchor.left : 0
+  const anchorRight = Number.isFinite(anchor.right) ? anchor.right : anchorLeft
   const popWidth = Math.max(0, Number(pop.width) || 0)
   const popHeight = Math.max(0, Number(pop.height) || 0)
 
@@ -40,20 +43,33 @@ function placeTooltip(input) {
   const left = Number.isFinite(bounds.left) ? bounds.left : 0
   const right = Number.isFinite(bounds.right) ? bounds.right : left
 
-  const roomAbove = anchorTop - gap - popHeight - (top + pad)
+  const roomRight = right - pad - (anchorRight + gap) - popWidth
   const roomBelow = bottom - pad - (anchorBottom + gap) - popHeight
+  const roomAbove = anchorTop - gap - popHeight - (top + pad)
 
-  let placement = "top"
-  if (roomAbove >= 0) placement = "top"
+  let placement = "right"
+  if (roomRight >= 0) placement = "right"
   else if (roomBelow >= 0) placement = "bottom"
-  else placement = roomBelow > roomAbove ? "bottom" : "top"
+  else if (roomAbove >= 0) placement = "top"
+  else {
+    const rooms = [
+      ["right", roomRight],
+      ["bottom", roomBelow],
+      ["top", roomAbove],
+    ]
+    placement = rooms.reduce((best, item) => (item[1] > best[1] ? item : best))[0]
+  }
 
-  const desiredTop = placement === "top" ? anchorTop - gap - popHeight : anchorBottom + gap
-  const maxTop = bottom - pad - popHeight
-  const resolvedTop = clamp(desiredTop, top + pad, maxTop)
-
-  const maxLeft = right - pad - popWidth
-  const resolvedLeft = clamp(anchorLeft, left + pad, maxLeft)
+  let resolvedLeft
+  let resolvedTop
+  if (placement === "right") {
+    resolvedLeft = clamp(anchorRight + gap, left + pad, right - pad - popWidth)
+    resolvedTop = clamp(anchorTop, top + pad, bottom - pad - popHeight)
+  } else {
+    resolvedLeft = clamp(anchorLeft, left + pad, right - pad - popWidth)
+    const desiredTop = placement === "bottom" ? anchorBottom + gap : anchorTop - gap - popHeight
+    resolvedTop = clamp(desiredTop, top + pad, bottom - pad - popHeight)
+  }
 
   return {
     left: Math.round(resolvedLeft),
