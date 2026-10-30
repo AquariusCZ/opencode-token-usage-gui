@@ -307,6 +307,9 @@ var require_footer = __commonJS({
   -webkit-user-select: text;
   transition: background-color 140ms ease;
 }
+[${FOOTER_ATTR}][hidden] {
+  display: none !important;
+}
 [${FOOTER_ATTR}]:hover,
 [${FOOTER_ATTR}][data-open="true"] {
   background: var(--v2-overlay-simple-overlay-hover, rgba(127, 127, 127, 0.08));
@@ -1346,7 +1349,12 @@ module.exports = Plugin.define({
       if (!observer || observedScroll === scroll) return;
       observer.disconnect();
       observedScroll = scroll;
-      observer.observe(scroll, { childList: true, subtree: true });
+      observer.observe(scroll, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["aria-hidden"]
+      });
     };
     const tick = (now) => {
       if (continuous) {
@@ -1406,6 +1414,16 @@ module.exports = Plugin.define({
         const info = data.session.get && data.session.get(session.id);
         const turns = buildTurns(messages, info && info.revert && info.revert.messageID);
         if (turns.size === 0) return;
+        const statusApi = data.session && data.session.status;
+        let running = false;
+        if (typeof statusApi === "function") {
+          try {
+            running = statusApi.call(data.session, session.id) === "running";
+          } catch {
+          }
+        }
+        const turnIds = Array.from(turns.keys());
+        const activeTurnId = running ? turnIds[turnIds.length - 1] : null;
         const byMessage = /* @__PURE__ */ new Map();
         known = new Set(turns.keys());
         for (const [turnId, turn] of turns) {
@@ -1453,6 +1471,14 @@ module.exports = Plugin.define({
             target.appendChild(entry.root);
             entry.targetEl = target;
             if (entry.isOpen()) entry.reposition();
+          }
+          const working = target.getAttribute("aria-hidden") === "true" || running && turnId === activeTurnId;
+          if (working) {
+            if (entry.isOpen()) entry.close();
+            entry.root.hidden = true;
+          } else if (entry.root.hidden) {
+            entry.root.hidden = false;
+            paint(entry, view);
           }
         }
       } finally {

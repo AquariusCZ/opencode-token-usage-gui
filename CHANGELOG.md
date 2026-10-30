@@ -7,6 +7,9 @@
 - **A target you can actually hit.** The footer is a padded pill (about 30 px tall) with a dedicated info button
   whose hit area extends past its glyph. The card stays open when the pointer moves onto it — an invisible 8 px
   bridge spans the gap — so it does not vanish while you aim at it.
+- **Quiet while the turn runs.** The active turn's footer is hidden while the session reports `running` (or the
+  app marks its assistant content `aria-hidden`) and returns when the turn settles. Previous turns keep their
+  footers, so the live status is never covered by metadata and the footer is never covered by it.
 - **Click to pin.** The info button pins the card; pinned text is selectable, and Escape, a second click, or a
   click outside closes it. Keyboard users get the same flow through Tab / Enter / Space.
 - **Readable at a glance.** The card adds a composition bar, a six-cell metric grid (input, output, reasoning,

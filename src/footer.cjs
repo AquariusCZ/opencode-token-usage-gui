@@ -36,6 +36,9 @@ const CSS = `
   -webkit-user-select: text;
   transition: background-color 140ms ease;
 }
+[${FOOTER_ATTR}][hidden] {
+  display: none !important;
+}
 [${FOOTER_ATTR}]:hover,
 [${FOOTER_ATTR}][data-open="true"] {
   background: var(--v2-overlay-simple-overlay-hover, rgba(127, 127, 127, 0.08));

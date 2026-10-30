@@ -345,7 +345,12 @@ module.exports = Plugin.define({
       if (!observer || observedScroll === scroll) return
       observer.disconnect()
       observedScroll = scroll
-      observer.observe(scroll, { childList: true, subtree: true })
+      observer.observe(scroll, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["aria-hidden"],
+      })
     }
 
     const tick = (now) => {
@@ -414,6 +419,16 @@ module.exports = Plugin.define({
         const turns = buildTurns(messages, info && info.revert && info.revert.messageID)
         if (turns.size === 0) return
 
+        const statusApi = data.session && data.session.status
+        let running = false
+        if (typeof statusApi === "function") {
+          try {
+            running = statusApi.call(data.session, session.id) === "running"
+          } catch {}
+        }
+        const turnIds = Array.from(turns.keys())
+        const activeTurnId = running ? turnIds[turnIds.length - 1] : null
+
         const byMessage = new Map()
         known = new Set(turns.keys())
         for (const [turnId, turn] of turns) {
@@ -471,6 +486,21 @@ module.exports = Plugin.define({
             target.appendChild(entry.root)
             entry.targetEl = target
             if (entry.isOpen()) entry.reposition()
+          }
+
+          // The app marks the assistant content of the working turn with
+          // aria-hidden and reports the session as "running". That live status
+          // is the primary UI: keep the active turn's metadata out of its way
+          // (and out from under it), then reveal the footer when it settles.
+          const working =
+            target.getAttribute("aria-hidden") === "true" ||
+            (running && turnId === activeTurnId)
+          if (working) {
+            if (entry.isOpen()) entry.close()
+            entry.root.hidden = true
+          } else if (entry.root.hidden) {
+            entry.root.hidden = false
+            paint(entry, view)
           }
         }
       } finally {
