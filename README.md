@@ -68,7 +68,7 @@ numbers that actually change the bill.
   composition bar, a six-cell metric grid, request count, wall time, and the exchange-rate source. The card stays
   open while your pointer is over it (an invisible bridge covers the gap) and can be pinned with the info button
   for persistent reading and copying. It prefers the free gutter to the right of the footer, then below it, then
-  above, so it does not cover the turn's step rows on a wide window; it clamps to the timeline and repositions on
+  above, so it does not cover the turn's step rows on a wide window; it clamps to the viewport and repositions on
   scroll and resize.
 - **Live from the first token.** While a turn is thinking or running tools, its capsule is parked in the app's
   86 px tail lane at the bottom of the timeline. It starts at zero and updates live, then moves under the turn

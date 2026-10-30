@@ -13,7 +13,7 @@
   cache read, cache write, cache hit), request count, wall time, and the exchange-rate source. The visible footer
   stays compact.
 - **Out of the way.** The card prefers the free gutter to the right of the footer, then below, then above, so it
-  does not sit on top of the turn's step rows when the window has room. It clamps to the timeline and repositions
+  does not sit on top of the turn's step rows when the window has room. It clamps to the viewport and repositions
   on scroll and resize.
 - **Live while it runs.** The active turn's capsule is parked in the app's bottom tail lane while thinking/tools
   run, starts at zero, and updates live; it returns under the turn when the turn settles. Completed turns keep

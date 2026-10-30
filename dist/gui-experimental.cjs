@@ -1501,7 +1501,16 @@ module.exports = Plugin.define({
           const turn = turns.get(turnId);
           if (!turn) continue;
           const active = running && turnId === activeTurnId;
-          if (!active && turn.totals.total <= 0 && turn.cost <= 0) continue;
+          if (!active && turn.totals.total <= 0 && turn.cost <= 0) {
+            const staleKey = `${session.id}:${turnId}`;
+            const staleEntry = state.get(staleKey);
+            if (staleEntry) {
+              state.delete(staleKey);
+              if (staleEntry.dispose) staleEntry.dispose();
+              staleEntry.root.remove();
+            }
+            continue;
+          }
           const key = `${session.id}:${turnId}`;
           seen.add(key);
           let entry = state.get(key);
@@ -1529,9 +1538,6 @@ module.exports = Plugin.define({
             if (entry.isOpen()) entry.reposition();
           }
         }
-        for (const lane of scroll.querySelectorAll("[data-token-usage-live]")) {
-          if (!lane.firstChild) lane.remove();
-        }
       } finally {
         for (const [key, entry] of state) {
           if (seen.has(key)) continue;
@@ -1549,6 +1555,9 @@ module.exports = Plugin.define({
           state.delete(key);
           if (entry.dispose) entry.dispose();
           entry.root.remove();
+        }
+        for (const lane of document.querySelectorAll("[data-token-usage-live]")) {
+          if (!lane.firstChild) lane.remove();
         }
       }
     };
