@@ -115,6 +115,22 @@ function addUsage(target, usage) {
     target.input + target.output + target.reasoning + target.cacheRead + target.cacheWrite
 }
 
+/**
+ * Fold one ledger snapshot (`SessionInfo.tokens`) into running totals. The
+ * session ledger keeps a lifetime billed total, including title, compaction
+ * and subagent usage, so it is not the same thing as the loaded transcript.
+ */
+function addSessionTokens(target, tokens) {
+  if (!tokens || typeof tokens !== "object") return
+  target.input += finite(tokens.input)
+  target.output += finite(tokens.output)
+  target.reasoning += finite(tokens.reasoning)
+  target.cacheRead += finite(tokens.cache && tokens.cache.read)
+  target.cacheWrite += finite(tokens.cache && tokens.cache.write)
+  target.total =
+    target.input + target.output + target.reasoning + target.cacheRead + target.cacheWrite
+}
+
 function cacheHitRate(totals) {
   const prompt = finite(totals && totals.input) + finite(totals && totals.cacheRead) + finite(totals && totals.cacheWrite)
   if (prompt <= 0) return null
@@ -311,6 +327,7 @@ function formatDuration(milliseconds) {
 module.exports = {
   METRICS,
   TOKEN_KEYS,
+  addSessionTokens,
   addUsage,
   approachValue,
   buildTurns,

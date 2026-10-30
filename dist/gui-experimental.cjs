@@ -54,7 +54,7 @@ var require_core = __commonJS({
     function normalizePopoverSide2(value) {
       return String(value || "left").toLowerCase() === "right" ? "right" : "left";
     }
-    function emptyTotals() {
+    function emptyTotals2() {
       return {
         input: 0,
         output: 0,
@@ -89,6 +89,15 @@ var require_core = __commonJS({
       target.cacheWrite += usage.cacheWrite;
       target.total = target.input + target.output + target.reasoning + target.cacheRead + target.cacheWrite;
     }
+    function addSessionTokens2(target, tokens) {
+      if (!tokens || typeof tokens !== "object") return;
+      target.input += finite2(tokens.input);
+      target.output += finite2(tokens.output);
+      target.reasoning += finite2(tokens.reasoning);
+      target.cacheRead += finite2(tokens.cache && tokens.cache.read);
+      target.cacheWrite += finite2(tokens.cache && tokens.cache.write);
+      target.total = target.input + target.output + target.reasoning + target.cacheRead + target.cacheWrite;
+    }
     function cacheHitRate2(totals) {
       const prompt = finite2(totals && totals.input) + finite2(totals && totals.cacheRead) + finite2(totals && totals.cacheWrite);
       if (prompt <= 0) return null;
@@ -107,7 +116,7 @@ var require_core = __commonJS({
     function emptyTurn(id) {
       return {
         id,
-        totals: emptyTotals(),
+        totals: emptyTotals2(),
         cost: 0,
         requests: 0,
         startedAt: 0,
@@ -159,7 +168,7 @@ var require_core = __commonJS({
       return turns;
     }
     function summarizeTurns2(turns) {
-      const totals = emptyTotals();
+      const totals = emptyTotals2();
       let cost = 0;
       let requests = 0;
       let durationMs = 0;
@@ -240,12 +249,13 @@ var require_core = __commonJS({
     module2.exports = {
       METRICS: METRICS2,
       TOKEN_KEYS,
+      addSessionTokens: addSessionTokens2,
       addUsage,
       approachValue: approachValue2,
       buildTurns: buildTurns2,
       cacheHitRate: cacheHitRate2,
       clampNumber: clampNumber2,
-      emptyTotals,
+      emptyTotals: emptyTotals2,
       finite: finite2,
       formatCost,
       formatDuration,
@@ -909,6 +919,8 @@ var require_footer = __commonJS({
         totals.total,
         turn.cost,
         turn.requests,
+        turn.turns,
+        turn.partial,
         turn.durationMs,
         turn.cacheHitRate,
         view.currency,
@@ -946,6 +958,7 @@ var require_footer = __commonJS({
       if (turn.session && turn.turns > 0) parts.push(`${view.int(turn.turns)} ${copy.turns}`);
       parts.push(`${view.int(turn.requests)} ${copy.requests}`);
       if (turn.durationMs > 0) parts.push(formatDuration(turn.durationMs));
+      if (turn.session && turn.partial) parts.push(copy.loaded);
       setText2(entry.meta, parts.join(" \xB7 "));
       const rateText = view.showCost && turn.cost > 0 ? rateLine : "";
       entry.rate.hidden = !rateText;
@@ -1169,10 +1182,12 @@ var require_footer = __commonJS({
 var { Plugin, Style } = require("@opencode/plugin/gui");
 var {
   METRICS,
+  addSessionTokens,
   approachValue,
   buildTurns,
   cacheHitRate,
   clampNumber,
+  emptyTotals,
   finite,
   formatMoney,
   normalizeCurrency,
@@ -1229,6 +1244,7 @@ var COPY = {
     sessionBreakdown: "Session breakdown",
     turns: "turns",
     composition: "Token composition",
+    loaded: "loaded",
     showDetails: "Show token breakdown",
     hideDetails: "Hide token breakdown"
   },
@@ -1252,6 +1268,7 @@ var COPY = {
     sessionBreakdown: "\u4F1A\u8BDD\u660E\u7EC6",
     turns: "\u8F6E",
     composition: "tokens \u6784\u6210",
+    loaded: "\u5DF2\u52A0\u8F7D",
     showDetails: "\u67E5\u770B\u7528\u91CF\u660E\u7EC6",
     hideDetails: "\u6536\u8D77\u7528\u91CF\u660E\u7EC6"
   }
@@ -1344,6 +1361,7 @@ var hasVisibleQueue = (scroll) => {
     (element) => isVisible(element) && Boolean(element.querySelector('[data-component="session-queue-row"]'))
   );
 };
+var pendingWarned = false;
 var hasPendingQueue = (session) => {
   const data = session && session.server && session.server.data;
   const api = data && data.session && data.session.pending;
@@ -1351,8 +1369,15 @@ var hasPendingQueue = (session) => {
   try {
     const items = api.list(session.id);
     return Array.isArray(items) && items.some((item) => item && item.type !== "synthetic");
-  } catch {
-    return false;
+  } catch (error) {
+    if (!pendingWarned) {
+      pendingWarned = true;
+      console.warn(
+        "[token-usage-gui] could not read the pending queue; hiding the session summary",
+        error
+      );
+    }
+    return true;
   }
 };
 function contentTarget(row) {
@@ -1537,10 +1562,11 @@ module.exports = Plugin.define({
         refresh();
       }, MUTATION_DELAY_MS);
     };
-    const observeDock = () => {
+    const observeDock = (scroll) => {
       if (typeof MutationObserver === "undefined") return;
       if (!queueObserver) queueObserver = new MutationObserver(onDockMutation);
-      const dock = document.querySelector('[data-component="session-composer-dock"]');
+      const face = findComposerFace(scroll);
+      const dock = face && face.closest('[data-component="session-composer-dock"]') || document.querySelector('[data-component="session-composer-dock"]');
       if (!dock) {
         if (observedDock) {
           queueObserver.disconnect();
@@ -1647,7 +1673,7 @@ module.exports = Plugin.define({
         const scroll = findScroll();
         if (!scroll) return;
         observe(scroll);
-        observeDock();
+        observeDock(scroll);
         const statusApi = data.session && data.session.status;
         running = false;
         if (typeof statusApi === "function") {
@@ -1659,6 +1685,38 @@ module.exports = Plugin.define({
         const turnIds = Array.from(turns.keys());
         activeTurnId = running ? turnIds[turnIds.length - 1] : null;
         const summary = summarizeTurns(turns);
+        const ledger = emptyTotals();
+        let ledgerOk = false;
+        try {
+          if (info && info.tokens) {
+            const family = info.parentID || typeof data.session.family !== "function" ? null : data.session.family(session.id);
+            const ids = Array.from(/* @__PURE__ */ new Set([session.id, ...Array.isArray(family) ? family : []]));
+            for (const id of ids) {
+              const entry = data.session.get(id);
+              if (entry && entry.tokens) {
+                addSessionTokens(ledger, entry.tokens);
+                ledgerOk = true;
+              }
+            }
+          }
+        } catch {
+        }
+        if (ledgerOk) {
+          summary.totals = ledger;
+          summary.cacheHitRate = cacheHitRate(ledger);
+        }
+        if (info && Number.isFinite(Number(info.cost))) {
+          try {
+            summary.cost = typeof data.session.cost === "function" ? finite(data.session.cost(session.id)) : finite(info.cost);
+          } catch {
+            summary.cost = finite(info.cost);
+          }
+        }
+        try {
+          summary.partial = typeof data.session.message.more === "function" ? Boolean(data.session.message.more.call(data.session.message, session.id)) : !ledgerOk;
+        } catch {
+          summary.partial = !ledgerOk;
+        }
         const hasSummary = !running && !hasVisibleQueue(scroll) && !hasPendingQueue(session) && (summary.totals.total > 0 || summary.cost > 0);
         const liveHost = running || hasSummary ? ensureLiveHost(scroll) : null;
         const byMessage = /* @__PURE__ */ new Map();

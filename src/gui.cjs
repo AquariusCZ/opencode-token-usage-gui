@@ -3,10 +3,12 @@
 const { Plugin, Style } = require("@opencode/plugin/gui")
 const {
   METRICS,
+  addSessionTokens,
   approachValue,
   buildTurns,
   cacheHitRate,
   clampNumber,
+  emptyTotals,
   finite,
   formatMoney,
   normalizeCurrency,
@@ -65,6 +67,7 @@ const COPY = {
     sessionBreakdown: "Session breakdown",
     turns: "turns",
     composition: "Token composition",
+    loaded: "loaded",
     showDetails: "Show token breakdown",
     hideDetails: "Hide token breakdown",
   },
@@ -88,6 +91,7 @@ const COPY = {
     sessionBreakdown: "会话明细",
     turns: "轮",
     composition: "tokens 构成",
+    loaded: "已加载",
     showDetails: "查看用量明细",
     hideDetails: "收起用量明细",
   },
@@ -207,10 +211,15 @@ const hasVisibleQueue = (scroll) => {
   )
 }
 
+let pendingWarned = false
+
 /**
  * True while the session has a prompt waiting to run, whether or not its queue
  * panel is mounted or visible (closed dock, a question/elicitation blocking the
  * composer). Synthetic prompts are not user work and do not count.
+ *
+ * If the pending API exists but cannot be read, assume work is pending: hiding
+ * a summary is cheaper than showing a stale total over a running queue.
  */
 const hasPendingQueue = (session) => {
   const data = session && session.server && session.server.data
@@ -219,8 +228,15 @@ const hasPendingQueue = (session) => {
   try {
     const items = api.list(session.id)
     return Array.isArray(items) && items.some((item) => item && item.type !== "synthetic")
-  } catch {
-    return false
+  } catch (error) {
+    if (!pendingWarned) {
+      pendingWarned = true
+      console.warn(
+        "[token-usage-gui] could not read the pending queue; hiding the session summary",
+        error,
+      )
+    }
+    return true
   }
 }
 
@@ -437,6 +453,8 @@ module.exports = Plugin.define({
      * Queue rows live in the composer dock, outside the timeline observer.
      * Watching the dock subtree makes a queued prompt appearing or disappearing
      * refresh the summary within the same debounce instead of the idle sample.
+     * Scope the dock to the active pane's composer face so a secondary pane's
+     * dock cannot drive the refresh.
      */
     let queueObserver = null
     let observedDock = null
@@ -447,10 +465,13 @@ module.exports = Plugin.define({
         refresh()
       }, MUTATION_DELAY_MS)
     }
-    const observeDock = () => {
+    const observeDock = (scroll) => {
       if (typeof MutationObserver === "undefined") return
       if (!queueObserver) queueObserver = new MutationObserver(onDockMutation)
-      const dock = document.querySelector('[data-component="session-composer-dock"]')
+      const face = findComposerFace(scroll)
+      const dock =
+        (face && face.closest('[data-component="session-composer-dock"]')) ||
+        document.querySelector('[data-component="session-composer-dock"]')
       if (!dock) {
         if (observedDock) {
           queueObserver.disconnect()
@@ -587,7 +608,7 @@ module.exports = Plugin.define({
         const scroll = findScroll()
         if (!scroll) return
         observe(scroll)
-        observeDock()
+        observeDock(scroll)
 
         const statusApi = data.session && data.session.status
         running = false
@@ -599,6 +620,54 @@ module.exports = Plugin.define({
         const turnIds = Array.from(turns.keys())
         activeTurnId = running ? turnIds[turnIds.length - 1] : null
         const summary = summarizeTurns(turns)
+
+        // The loaded message list is only the current window (20/40 messages),
+        // so summing it undercounts a long session. The session ledger is the
+        // lifetime billed total: it includes title/compaction usage, reverted
+        // usage (no refund) and, when the API exists, subagent descendants.
+        // Turn/request/active-time counts still describe the loaded window and
+        // are marked "loaded" when older pages remain.
+        const ledger = emptyTotals()
+        let ledgerOk = false
+        try {
+          if (info && info.tokens) {
+            const family =
+              info.parentID || typeof data.session.family !== "function"
+                ? null
+                : data.session.family(session.id)
+            const ids = Array.from(new Set([session.id, ...(Array.isArray(family) ? family : [])]))
+            for (const id of ids) {
+              const entry = data.session.get(id)
+              if (entry && entry.tokens) {
+                addSessionTokens(ledger, entry.tokens)
+                ledgerOk = true
+              }
+            }
+          }
+        } catch {}
+        if (ledgerOk) {
+          summary.totals = ledger
+          summary.cacheHitRate = cacheHitRate(ledger)
+        }
+        if (info && Number.isFinite(Number(info.cost))) {
+          try {
+            summary.cost =
+              typeof data.session.cost === "function"
+                ? finite(data.session.cost(session.id))
+                : finite(info.cost)
+          } catch {
+            summary.cost = finite(info.cost)
+          }
+        }
+        try {
+          summary.partial =
+            typeof data.session.message.more === "function"
+              ? Boolean(data.session.message.more.call(data.session.message, session.id))
+              : !ledgerOk
+        } catch {
+          summary.partial = !ledgerOk
+        }
+
         const hasSummary =
           !running &&
           !hasVisibleQueue(scroll) &&

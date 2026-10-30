@@ -76,9 +76,13 @@ numbers that actually change the bill.
   above the queued-message panel and the composer card. It starts at zero and updates live, then moves under the
   turn when the turn settles. Completed turns keep their capsules.
 - **Session summary when the work is done.** When the session is idle and no pending or queued message remains,
-  the composer dock switches to a session-wide capsule labeled “Session”. The inline capsule shows total tokens,
-  cost and cache hit across every completed turn; hover it for the full session card, which adds requests and
-  active time. Per-turn capsules stay in the transcript. Starting a new turn replaces it with the live capsule.
+  the composer dock switches to a session-wide capsule labeled “Session”. Token and cost totals come from the
+  app's session ledger — `session.get().tokens` plus `session.cost()`, including title/compaction and, when the
+  API is available, subagent usage — so they are lifetime billed totals, not the sum of the loaded transcript.
+  The inline capsule shows tokens, cost and cache hit; hover it for the full session card, which adds requests
+  and active time. Turn, request and active-time counts cover the loaded transcript and are marked “loaded” when
+  older message pages exist. Per-turn capsules stay in the transcript. Starting a new turn replaces the summary
+  with the live capsule.
 - **Above the app's normal layers.** The details card is rendered in a fixed body portal at z-index 2147483000,
   above the timeline, later messages and the composer, so normal stacking contexts cannot cover or clip it.
   An app-level modal/dialog may still sit above it.
@@ -322,11 +326,17 @@ user message
    `overflow-clip`) cannot clip a node outside the morph. The line starts at zero and updates live; when the turn
    settles it moves into the assistant content. Hovering opens the fixed body-portal card at z-index 2147483000,
    preferring the configured side (left by default), then below, then above. The follow timer skips a hidden window.
-6. When the session is idle with no pending/queued message, the dock shows a synthetic “Session” footer built by
-   `summarizeTurns(turns)`: sums of all completed turns, with a turn count in the meta line. Idleness is checked
-   against the client store's pending list, so a queued prompt with its panel closed still hides the summary; a
-   second `MutationObserver` watches the composer dock, so queue rows appearing or disappearing refresh within
-   the 120 ms debounce instead of the 1 s idle sample. It is replaced by the live capsule when the next turn starts.
+6. When the session is idle with no pending/queued message, the dock shows a synthetic “Session” footer. Token and
+   cost totals come from the app's session ledger: `session.get(id).tokens` and `session.cost(id)` (family-aware
+   for a root, own usage for a child), folded over the session and, when the API exists, its family. The ledger
+   includes title/compaction usage, reverted usage (a revert does not refund) and subagent usage, so the summary is
+   a lifetime billed total and can exceed the sum of the per-turn footers. Turn count, requests and active time
+   still come from `summarizeTurns(turns)` over the loaded transcript, and are labeled “loaded” when
+   `message.more(id)` reports older pages. `message.sync`/`loadMore` are never called, so reading the summary never
+   mutates the transcript or the scroll position. Idleness is checked against the client store's pending list, so a
+   queued prompt with its panel closed still hides the summary; a second `MutationObserver` watches the active
+   pane's composer dock, so queue rows appearing or disappearing refresh within the 120 ms debounce instead of the
+   1 s idle sample. It is replaced by the live capsule when the next turn starts.
 
 There is no official message-footer slot in the GUI plugin API, so the last step is DOM injection. That is the
 intentionally fragile part: if a future OpenCode release renames the slot, the footer disappears (the plugin logs
@@ -362,7 +372,9 @@ Use `detailed` if you want more metrics on the visible line.
 
 **Where is the total for the whole session?**
 When the session is idle and no pending or queued message remains, the composer dock shows a “Session” capsule
-summing every turn; hover it for the session breakdown. Per-turn capsules remain in the conversation.
+backed by the app's session ledger, so its tokens and cost include title/compaction (and subagent) usage, not just
+the visible transcript; hover it for the session breakdown. Turn/request/active-time counts cover the loaded
+transcript and say “loaded” when older pages exist. Per-turn capsules remain in the conversation.
 
 **Can I see reasoning tokens?**
 Yes: set `detailed: true`, or open the details card. Reasoning is always in the card.

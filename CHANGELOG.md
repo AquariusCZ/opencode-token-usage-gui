@@ -3,10 +3,13 @@
 ## 0.3.0 — 2026-10-30
 
 - **Session summary at the end.** When a session is idle with no pending/queued message, the composer dock shows a
-  synthetic “Session” capsule and card aggregating every completed turn (tokens, cost, cache hit, requests,
-  active time, turn count). The gate reads the client store's pending list, so a queued prompt with its panel
-  closed still hides the summary, and the composer dock is observed so queue changes refresh within the debounce.
-  Per-turn capsules remain; a new turn replaces it with the live capsule.
+  synthetic “Session” capsule and card. Token and cost totals come from the app's session ledger
+  (`session.get().tokens`, `session.cost()`), so they include title/compaction and, when available, subagent usage;
+  turn/request/active-time counts come from the loaded transcript and are marked “loaded” when older pages exist.
+  The gate reads the client store's pending list, so a queued prompt with its panel closed still hides the summary,
+  and the active pane's composer dock is observed so queue changes refresh within the debounce. The summary never
+  calls `message.sync`/`loadMore`, so it does not mutate the transcript or scroll. Per-turn capsules remain; a new
+  turn replaces it with the live capsule.
 - **A real breakdown card replaces the native `title` tooltip.** Hovering or focusing the footer now opens a
   theme-aware card instead of the browser's delayed, unstyleable tooltip.
 - **A target you can actually hit.** The footer is a padded pill (about 30 px tall) with a dedicated info button

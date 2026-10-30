@@ -4,10 +4,12 @@ const test = require("node:test")
 const assert = require("node:assert/strict")
 
 const {
+  addSessionTokens,
   approachValue,
   buildTurns,
   cacheHitRate,
   clampNumber,
+  emptyTotals,
   formatCost,
   formatDuration,
   formatInt,
@@ -59,6 +61,27 @@ test("tokenUsage follows OpenCode's total formula", () => {
     cacheWrite: 4,
     total: 169,
   })
+})
+
+test("addSessionTokens folds a ledger snapshot into running totals", () => {
+  const totals = emptyTotals()
+  addSessionTokens(totals, { input: 1, output: 2, reasoning: 3, cache: { read: 4, write: 5 } })
+
+  assert.equal(totals.total, 15)
+  assert.deepEqual(totals, {
+    input: 1,
+    output: 2,
+    reasoning: 3,
+    cacheRead: 4,
+    cacheWrite: 5,
+    total: 15,
+  })
+
+  addSessionTokens(totals, { input: 10, output: 0, reasoning: 0, cache: { read: 0, write: 0 } })
+  assert.equal(totals.total, 25)
+
+  addSessionTokens(totals, null)
+  assert.equal(totals.total, 25)
 })
 
 test("tokenUsage returns null without a tokens object", () => {

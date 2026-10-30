@@ -613,6 +613,8 @@ function updateFooter(entry, turn, view) {
     totals.total,
     turn.cost,
     turn.requests,
+    turn.turns,
+    turn.partial,
     turn.durationMs,
     turn.cacheHitRate,
     view.currency,
@@ -657,6 +659,7 @@ function updateFooter(entry, turn, view) {
   if (turn.session && turn.turns > 0) parts.push(`${view.int(turn.turns)} ${copy.turns}`)
   parts.push(`${view.int(turn.requests)} ${copy.requests}`)
   if (turn.durationMs > 0) parts.push(formatDuration(turn.durationMs))
+  if (turn.session && turn.partial) parts.push(copy.loaded)
   setText(entry.meta, parts.join(" · "))
 
   const rateText = view.showCost && turn.cost > 0 ? rateLine : ""
