@@ -138,11 +138,11 @@ Options go in the plugin entry of `opencode.json(c)`:
         "detailed": false,
         "showCost": true,
         "animate": true,
-        "refreshMode": "continuous",
+        "refreshMode": "continuous", // default; set "interval" for the two options below
         "sampleMs": 100,
         "smoothMs": 250,
-        "refreshMs": 500,
-        "tweenMs": 550,
+        "refreshMs": 500, // interval mode only
+        "tweenMs": 550, // interval mode only
         "currency": "CNY",
         "usdToCny": 6.68
       }

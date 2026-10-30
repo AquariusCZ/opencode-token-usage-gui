@@ -126,11 +126,11 @@ opencode plugin remove opencode-token-usage-gui
         "detailed": false,
         "showCost": true,
         "animate": true,
-        "refreshMode": "continuous",
+        "refreshMode": "continuous", // 默认；改成 "interval" 才使用下面两个
         "sampleMs": 100,
         "smoothMs": 250,
-        "refreshMs": 500,
-        "tweenMs": 550,
+        "refreshMs": 500, // 仅 interval 模式
+        "tweenMs": 550, // 仅 interval 模式
         "currency": "CNY",
         "usdToCny": 6.68
       }
