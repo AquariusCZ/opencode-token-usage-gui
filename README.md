@@ -23,16 +23,16 @@ A zero-config GUI plugin for **OpenCode Desktop**: per-turn tokens, cache hit ra
 ## The 10-second version
 
 ```text
-本轮  输入 15,733 · 输出 6,250 · 缓存读 10,300,544 · 缓存命中 99.8% · 合计 10,332,638 · ¥0.288
+This turn · Input 15,733 · Output 6,250 · Cache read 10,300,544 · Cache hit 99.8% · Total 10,332,638 · ¥0.288
 ```
 
 Hover the line for the full breakdown:
 
 ```text
-本轮 10,332,638 词元 · ¥0.288 ($0.0431)
-输入 15,733 · 输出 6,250 · 推理 10,111
-缓存读 10,300,544 · 缓存写 0 · 缓存命中 99.8%
-21 次模型请求 · 2m 15s
+This turn 10,332,638 tokens · ¥0.288 ($0.0431)
+Input 15,733 · Output 6,250 · Reasoning 10,111
+Cache read 10,300,544 · Cache write 0 · Cache hit 99.8%
+21 model requests · 2m 15s
 ```
 
 ## Why not just use the built-in context panel?
