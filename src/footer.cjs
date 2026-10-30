@@ -743,29 +743,26 @@ function bindTooltip(entry, view) {
       hide(0)
     }
     document.addEventListener("pointerdown", onOutside, true)
-    document.addEventListener("keydown", handleDocKey, true)
+    document.addEventListener("keydown", handleDocKey, false)
   }
 
   const detachOutside = () => {
     if (!onOutside) return
     document.removeEventListener("pointerdown", onOutside, true)
-    document.removeEventListener("keydown", handleDocKey, true)
+    document.removeEventListener("keydown", handleDocKey, false)
     onOutside = null
   }
 
   const handleDocKey = (event) => {
     if (event.key !== "Escape" || !pinned) return
+    if (event.defaultPrevented) return
     const target = event.target
-    const inSurface = root.contains(target) || portal.contains(target)
-    const onInfo = document.activeElement === info
-    const hovering = root.matches(":hover") || portal.matches(":hover")
-    // Escape belongs to the app while it edits text or drives a dialog/menu.
     const editing =
       target.closest &&
       target.closest(
-        'input, textarea, select, [contenteditable="true"], [contenteditable=""], [role="dialog"], [role="menu"], [role="listbox"]',
+        'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"], [role="textbox"], [data-component="dock-prompt"], [data-kind="question"], [data-kind="elicitation"], [data-owns-escape]',
       )
-    if (!inSurface && !onInfo && !hovering && editing) return
+    if (editing) return
     event.stopPropagation()
     setPinned(false)
     hide(0)

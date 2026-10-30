@@ -412,7 +412,14 @@ module.exports = Plugin.define({
       const morph = face && face.parentElement
       const column = morph && morph.parentElement
       const dock = column && column.closest('[data-component="session-composer-dock"]')
-      if (face && morph && column && dock) {
+      if (
+        face &&
+        morph &&
+        morph.matches &&
+        morph.matches('[data-slot="composer-morph"]') &&
+        column &&
+        dock
+      ) {
         let host = column.querySelector(":scope > [data-token-usage-live]")
         if (!host) {
           host = document.createElement("div")

@@ -992,24 +992,22 @@ var require_footer = __commonJS({
           hide(0);
         };
         document.addEventListener("pointerdown", onOutside, true);
-        document.addEventListener("keydown", handleDocKey, true);
+        document.addEventListener("keydown", handleDocKey, false);
       };
       const detachOutside = () => {
         if (!onOutside) return;
         document.removeEventListener("pointerdown", onOutside, true);
-        document.removeEventListener("keydown", handleDocKey, true);
+        document.removeEventListener("keydown", handleDocKey, false);
         onOutside = null;
       };
       const handleDocKey = (event) => {
         if (event.key !== "Escape" || !pinned) return;
+        if (event.defaultPrevented) return;
         const target = event.target;
-        const inSurface = root.contains(target) || portal.contains(target);
-        const onInfo = document.activeElement === info;
-        const hovering = root.matches(":hover") || portal.matches(":hover");
         const editing = target.closest && target.closest(
-          'input, textarea, select, [contenteditable="true"], [contenteditable=""], [role="dialog"], [role="menu"], [role="listbox"]'
+          'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"], [role="textbox"], [data-component="dock-prompt"], [data-kind="question"], [data-kind="elicitation"], [data-owns-escape]'
         );
-        if (!inSurface && !onInfo && !hovering && editing) return;
+        if (editing) return;
         event.stopPropagation();
         setPinned(false);
         hide(0);
@@ -1479,7 +1477,7 @@ module.exports = Plugin.define({
       const morph = face && face.parentElement;
       const column = morph && morph.parentElement;
       const dock = column && column.closest('[data-component="session-composer-dock"]');
-      if (face && morph && column && dock) {
+      if (face && morph && morph.matches && morph.matches('[data-slot="composer-morph"]') && column && dock) {
         let host = column.querySelector(":scope > [data-token-usage-live]");
         if (!host) {
           host = document.createElement("div");

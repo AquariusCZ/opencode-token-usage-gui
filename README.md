@@ -42,7 +42,8 @@ Cache write 0     Cache hit 99.8%
 
 Click the info button to pin the card while you read or copy it. The preview stays open when you move onto it — an
 invisible 8 px bridge covers the gap — so there is nothing to chase; the pinned card closes with Escape or a click
-outside, and Escape stays with the app while focus is in a text field or dialog.
+outside. Escape closes it from any non-editing surface; text fields, editors, selects, menus/listboxes and dialogs
+keep Escape for the app.
 
 ## Why not just use the built-in context panel?
 
@@ -80,8 +81,8 @@ numbers that actually change the bill.
 - **A footer you can hit.** The visible line is a padded pill with a dedicated info button whose hit area extends
   past the glyph; no need to land on a single 12 px line.
 - **Keyboard accessible.** Tab to the info button, press Enter or Space to pin, Escape or an outside click to close.
-  Escape closes the card from any surface except a text field or dialog. `prefers-reduced-motion` disables the
-  card transition.
+  Escape closes the card from any non-editing surface; text fields, contenteditable editors, selects, menus/listboxes
+  and dialogs keep Escape for the app. `prefers-reduced-motion` disables the card transition.
 - **Live count-up.** Continuous mode samples the store at 100 ms while running and follows the target with a
   60 Hz first-order lag; a new sample changes the target without restarting the animation, so the counter reads
   as one continuous motion. An `interval` mode keeps the old discrete refresh + tween behavior. Respects
@@ -358,8 +359,8 @@ Yes: set `"currency": "USD"`. The card still shows the original USD amount when 
 
 **How do I keep the card open?**
 Click the small info button at the end of the footer. The pinned card is selectable, so you can copy numbers; click
-the button again, press Escape, or click outside to close it. Escape closes it from any surface except a text field
-or dialog.
+the button again, press Escape, or click outside to close it. Escape closes it from any non-editing surface; text
+fields, editors, selects, menus/listboxes and dialogs keep Escape for the app.
 
 **Can I choose which side the card opens on?**
 Yes: set `"popoverSide": "left"` (default) or `"popoverSide": "right"`. The chosen side is tried first, then below,
