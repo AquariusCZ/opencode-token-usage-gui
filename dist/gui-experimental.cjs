@@ -668,14 +668,17 @@ var require_footer = __commonJS({
     padding-inline: 24px;
   }
 }
-.tu-live-status {
+.tu-live-dock {
+  width: 100%;
   display: flex;
   align-items: center;
-  flex: none;
   min-width: 0;
+  pointer-events: auto;
+  padding: 2px 0 4px;
 }
-.tu-live-status [${FOOTER_ATTR}] {
+.tu-live-dock [${FOOTER_ATTR}] {
   margin: 0;
+  max-width: 100%;
 }
 @media (prefers-reduced-motion: reduce) {
   [${FOOTER_ATTR}],
@@ -1419,14 +1422,15 @@ module.exports = Plugin.define({
       observer.observe(scroll, { childList: true, subtree: true });
     };
     const ensureLiveHost = (scroll) => {
-      const working = scroll.querySelector('[data-component="session-working"]');
-      if (working && working.parentElement) {
-        let host = working.parentElement.querySelector(":scope > [data-token-usage-live]");
+      const face = document.querySelector('[data-slot="composer-face"]');
+      const column = face && face.parentElement;
+      if (column && face.parentElement === column) {
+        let host = column.querySelector(":scope > [data-token-usage-live]");
         if (!host) {
           host = document.createElement("div");
-          host.className = "tu-live-status";
+          host.className = "tu-live-dock";
           host.setAttribute("data-token-usage-live", "");
-          working.after(host);
+          column.insertBefore(host, face);
         }
         return host;
       }

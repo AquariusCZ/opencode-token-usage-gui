@@ -329,7 +329,7 @@
       .main {
         min-width: 0;
         display: grid;
-        grid-template-rows: 54px 1fr 128px;
+        grid-template-rows: 54px 1fr auto;
         background: var(--bg);
         position: relative;
       }
@@ -427,28 +427,37 @@
         padding-top: 3px;
       }
 
-      .working-block {
-        margin-top: 18px;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-      }
-
-      .working-block [data-token-usage] {
-        margin: 0;
-      }
-
-      .working-label {
-        color: var(--v2-text-text-faint);
-        font-size: 12px;
-        letter-spacing: 0.01em;
-      }
-
       .composer-wrap {
         padding: 0 120px 18px;
         display: flex;
-        align-items: flex-end;
+        flex-direction: column;
+        gap: 8px;
+        align-items: stretch;
         background: linear-gradient(to bottom, transparent, var(--bg) 30%);
+      }
+
+      .live-dock {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .live-dock [data-token-usage] {
+        margin: 0;
+      }
+
+      .mock-pills {
+        display: flex;
+        gap: 6px;
+        color: var(--faint);
+        font-size: 11px;
+      }
+
+      .mock-pill {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 1px 8px;
+        background: var(--panel);
       }
 
       .composer {
@@ -979,9 +988,14 @@
                 </div>
               </div>
             </div>
+          </section>
 
-            <div class="working-block">
-              <div class="working-label">工作中</div>
+          <div class="composer-wrap">
+            <div class="live-dock">
+              <div class="mock-pills">
+                <span class="mock-pill">1 subagent</span>
+                <span class="mock-pill">Goal</span>
+              </div>
               <div data-token-usage="" role="note" aria-live="off">
                 <span class="tu-label">This turn</span>
                 <span class="tu-group"><span class="tu-sep" aria-hidden="true">·</span><span class="tu-item"><span class="tu-key">Input</span><span class="tu-val">2,143</span></span></span>
@@ -998,9 +1012,6 @@
                 </button>
               </div>
             </div>
-          </section>
-
-          <div class="composer-wrap">
             <div class="composer">
               <div class="placeholder">Ask anything, / for commands, @ for context...</div>
               <div class="composer-row">

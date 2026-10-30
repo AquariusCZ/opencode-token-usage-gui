@@ -17,9 +17,10 @@
   on scroll and resize.
 - **Configurable card side.** `popoverSide` (`"left"` default, or `"right"`) picks the preferred gutter; if it
   does not fit, the card falls back below, then above. It never switches to the opposite side.
-- **Live while it runs.** The active turn's capsule follows the app's working indicator — inline with it when it
-  is shown, otherwise in the bottom tail lane — starts at zero, and updates live; it returns under the turn when
-  the turn settles. Completed turns keep their own capsules.
+- **Occlusion-proof live line.** The active turn's capsule is a normal flow child of the composer dock, on its own
+  line below the app's subagent/Goal pills and above the input. The app's z-70 composer lane can no longer paint
+  over it; the dock's ResizeObserver updates the timeline inset. It starts at zero, updates live, and moves under
+  the turn when it settles. Completed turns keep their own capsules.
 - **Top-layer card.** The details card is now a fixed body portal at z-index 2147483000, so virtualized-row
   clipping, later messages and the composer cannot cover or cut it.
 - **Theme-native.** Background, borders, elevation, text and overlay colors come from the desktop's own v2 tokens,

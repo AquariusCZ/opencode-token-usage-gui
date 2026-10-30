@@ -372,14 +372,17 @@ const CSS = `
     padding-inline: 24px;
   }
 }
-.tu-live-status {
+.tu-live-dock {
+  width: 100%;
   display: flex;
   align-items: center;
-  flex: none;
   min-width: 0;
+  pointer-events: auto;
+  padding: 2px 0 4px;
 }
-.tu-live-status [${FOOTER_ATTR}] {
+.tu-live-dock [${FOOTER_ATTR}] {
   margin: 0;
+  max-width: 100%;
 }
 @media (prefers-reduced-motion: reduce) {
   [${FOOTER_ATTR}],

@@ -352,29 +352,30 @@ module.exports = Plugin.define({
     }
 
     /**
-     * The live capsule belongs on the same flex row as the app's own working
-     * indicator ("Working"), so it reads next to the status text instead of
-     * far below it. The tail lane is only the fallback for rows without one,
-     * e.g. a pure thinking row.
+     * The active turn's capsule lives in the composer dock as a normal flow
+     * child, immediately before the composer face. The app's composer pills
+     * (subagents, Goal, todos) are an absolute z-70 layer above the input; a
+     * capsule inside the timeline is painted under them and masked by the
+     * bottom fade. A flow child in the dock is measured with the dock, so the
+     * timeline inset follows and the pills sit above it instead of on top.
+     * Older builds without a composer face fall back to the timeline tail.
      */
     const ensureLiveHost = (scroll) => {
-      const working = scroll.querySelector('[data-component="session-working"]')
-      if (working && working.parentElement) {
-        let host = working.parentElement.querySelector(":scope > [data-token-usage-live]")
+      const face = document.querySelector('[data-slot="composer-face"]')
+      const column = face && face.parentElement
+      if (column && face.parentElement === column) {
+        let host = column.querySelector(":scope > [data-token-usage-live]")
         if (!host) {
           host = document.createElement("div")
-          host.className = "tu-live-status"
+          host.className = "tu-live-dock"
           host.setAttribute("data-token-usage-live", "")
-          working.after(host)
+          column.insertBefore(host, face)
         }
         return host
       }
 
       const spacer = scroll.querySelector('[data-timeline-row="bottom-spacer"]')
       if (!spacer) return null
-      // Only a direct child counts here: a leftover inline host can live deeper
-      // inside the spacer (the activity lane), and reusing it would keep the
-      // capsule out of the tail lane.
       let lane = spacer.querySelector(":scope > [data-token-usage-live]")
       if (!lane) {
         lane = document.createElement("div")

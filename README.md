@@ -71,10 +71,10 @@ numbers that actually change the bill.
   for persistent reading and copying. It opens on the configured side of the footer (left by default), then below
   it, then above, so it does not cover the turn's step rows on a wide window; it clamps to the viewport and
   repositions on scroll and resize.
-- **Live from the first token.** While a turn is thinking or running tools, its capsule follows the app's live
-  working indicator — inline next to “Working” when it is shown, otherwise in the 86 px tail lane at the bottom
-  of the timeline. It starts at zero and updates live, then moves under the turn when the turn settles.
-  Completed turns keep their own capsules.
+- **Live from the first token.** While a turn is thinking or running tools, its capsule sits on its own line in the
+  composer dock — below the app's subagent/Goal pills and above the input, never inside the scrolling timeline.
+  It starts at zero and updates live, then moves under the turn when the turn settles. Completed turns keep their
+  capsules.
 - **On the top layer.** The details card is rendered in a fixed body portal at z-index 2147483000, so later
   conversation rows, virtualized-row clipping, and the timeline scroll container cannot cover or clip it.
 - **A footer you can hit.** The visible line is a padded pill with a dedicated info button whose hit area extends
@@ -308,12 +308,12 @@ user message
    a footer node.
 4. A 100 ms sampler (1000 ms when idle) keeps values fresh; a `MutationObserver` re-attaches the footer when the
    app re-renders the timeline; `requestAnimationFrame` animates changes.
-5. While the app reports `session.status` as `running` (thinking or tools), the active turn's footer joins the
-   app's `[data-component="session-working"]` row inline when it is rendered, otherwise it falls back to the
-   `[data-timeline-row="bottom-spacer"]` tail lane, starting at zero and updating live; when the turn
-   settles it moves into the assistant content. Hovering opens a card rendered into a fixed body portal at
-   z-index 2147483000, preferring the configured side (left by default), then below, then above. The timer pauses
-   while the window is hidden.
+5. While the app reports `session.status` as `running` (thinking or tools), the active turn's footer is inserted as
+   a normal flow child of `[data-component="session-composer-dock"]`, immediately before `[data-slot="composer-face"]`.
+   The app's pills are an absolute z-70 layer above the input, so this line cannot be covered; the dock's
+   ResizeObserver updates the timeline inset. The line starts at zero and updates live; when the turn settles it
+   moves into the assistant content. Hovering opens the fixed body-portal card at z-index 2147483000, preferring
+   the configured side (left by default), then below, then above. The timer pauses while the window is hidden.
 
 There is no official message-footer slot in the GUI plugin API, so the last step is DOM injection. That is the
 intentionally fragile part: if a future OpenCode release renames the slot, the footer disappears (the plugin logs
