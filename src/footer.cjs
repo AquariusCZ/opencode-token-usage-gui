@@ -368,6 +368,15 @@ const CSS = `
     padding-inline: 24px;
   }
 }
+.tu-live-status {
+  display: flex;
+  align-items: center;
+  flex: none;
+  min-width: 0;
+}
+.tu-live-status [${FOOTER_ATTR}] {
+  margin: 0;
+}
 @media (prefers-reduced-motion: reduce) {
   [${FOOTER_ATTR}],
   .tu-portal .tu-pop,

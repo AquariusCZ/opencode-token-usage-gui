@@ -654,6 +654,15 @@ var require_footer = __commonJS({
     padding-inline: 24px;
   }
 }
+.tu-live-status {
+  display: flex;
+  align-items: center;
+  flex: none;
+  min-width: 0;
+}
+.tu-live-status [${FOOTER_ATTR}] {
+  margin: 0;
+}
 @media (prefers-reduced-motion: reduce) {
   [${FOOTER_ATTR}],
   .tu-portal .tu-pop,
@@ -1391,8 +1400,21 @@ module.exports = Plugin.define({
       observedScroll = scroll;
       observer.observe(scroll, { childList: true, subtree: true });
     };
-    const ensureLiveLane = (spacer) => {
-      let lane = spacer.querySelector("[data-token-usage-live]");
+    const ensureLiveHost = (scroll) => {
+      const working = scroll.querySelector('[data-component="session-working"]');
+      if (working && working.parentElement) {
+        let host = working.parentElement.querySelector(":scope > [data-token-usage-live]");
+        if (!host) {
+          host = document.createElement("div");
+          host.className = "tu-live-status";
+          host.setAttribute("data-token-usage-live", "");
+          working.after(host);
+        }
+        return host;
+      }
+      const spacer = scroll.querySelector('[data-timeline-row="bottom-spacer"]');
+      if (!spacer) return null;
+      let lane = spacer.querySelector(":scope > [data-token-usage-live]");
       if (!lane) {
         lane = document.createElement("div");
         lane.className = "tu-live-lane";
@@ -1472,8 +1494,7 @@ module.exports = Plugin.define({
         }
         const turnIds = Array.from(turns.keys());
         const activeTurnId = running ? turnIds[turnIds.length - 1] : null;
-        const liveSpacer = running ? scroll.querySelector('[data-timeline-row="bottom-spacer"]') : null;
-        const liveLane = liveSpacer ? ensureLiveLane(liveSpacer) : null;
+        const liveHost = running ? ensureLiveHost(scroll) : null;
         const byMessage = /* @__PURE__ */ new Map();
         known = new Set(turns.keys());
         for (const [turnId, turn] of turns) {
@@ -1529,7 +1550,7 @@ module.exports = Plugin.define({
             applyTurn(entry, turn, view, animate);
           }
           let target = null;
-          if (active && liveLane) target = liveLane;
+          if (active && liveHost) target = liveHost;
           else if (row) target = contentTarget(row);
           if (!target) continue;
           if (entry.targetEl !== target || !entry.root.isConnected || entry.root.parentElement !== target) {

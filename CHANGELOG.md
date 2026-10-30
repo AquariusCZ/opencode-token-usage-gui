@@ -15,9 +15,9 @@
 - **Out of the way.** The card prefers the free gutter to the right of the footer, then below, then above, so it
   does not sit on top of the turn's step rows when the window has room. It clamps to the viewport and repositions
   on scroll and resize.
-- **Live while it runs.** The active turn's capsule is parked in the app's bottom tail lane while thinking/tools
-  run, starts at zero, and updates live; it returns under the turn when the turn settles. Completed turns keep
-  their own capsules.
+- **Live while it runs.** The active turn's capsule follows the app's working indicator — inline with it when it
+  is shown, otherwise in the bottom tail lane — starts at zero, and updates live; it returns under the turn when
+  the turn settles. Completed turns keep their own capsules.
 - **Top-layer card.** The details card is now a fixed body portal at z-index 2147483000, so virtualized-row
   clipping, later messages and the composer cannot cover or cut it.
 - **Theme-native.** Background, borders, elevation, text and overlay colors come from the desktop's own v2 tokens,

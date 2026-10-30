@@ -70,9 +70,10 @@ numbers that actually change the bill.
   for persistent reading and copying. It prefers the free gutter to the right of the footer, then below it, then
   above, so it does not cover the turn's step rows on a wide window; it clamps to the viewport and repositions on
   scroll and resize.
-- **Live from the first token.** While a turn is thinking or running tools, its capsule is parked in the app's
-  86 px tail lane at the bottom of the timeline. It starts at zero and updates live, then moves under the turn
-  when the turn settles. Completed turns keep their own capsules.
+- **Live from the first token.** While a turn is thinking or running tools, its capsule follows the app's live
+  working indicator — inline next to “Working” when it is shown, otherwise in the 86 px tail lane at the bottom
+  of the timeline. It starts at zero and updates live, then moves under the turn when the turn settles.
+  Completed turns keep their own capsules.
 - **On the top layer.** The details card is rendered in a fixed body portal at z-index 2147483000, so later
   conversation rows, virtualized-row clipping, and the timeline scroll container cannot cover or clip it.
 - **A footer you can hit.** The visible line is a padded pill with a dedicated info button whose hit area extends
@@ -297,8 +298,9 @@ user message
    a footer node.
 4. A 100 ms sampler (1000 ms when idle) keeps values fresh; a `MutationObserver` re-attaches the footer when the
    app re-renders the timeline; `requestAnimationFrame` animates changes.
-5. While the app reports `session.status` as `running` (thinking or tools), the active turn's footer is parked in
-   the app's `[data-timeline-row="bottom-spacer"]` tail lane, starting at zero and updating live; when the turn
+5. While the app reports `session.status` as `running` (thinking or tools), the active turn's footer joins the
+   app's `[data-component="session-working"]` row inline when it is rendered, otherwise it falls back to the
+   `[data-timeline-row="bottom-spacer"]` tail lane, starting at zero and updating live; when the turn
    settles it moves into the assistant content. Hovering opens a card rendered into a fixed body portal at
    z-index 2147483000, preferring the right gutter, then below, then above. The timer pauses while the window is
    hidden.

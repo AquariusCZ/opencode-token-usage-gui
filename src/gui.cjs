@@ -348,8 +348,31 @@ module.exports = Plugin.define({
       observer.observe(scroll, { childList: true, subtree: true })
     }
 
-    const ensureLiveLane = (spacer) => {
-      let lane = spacer.querySelector("[data-token-usage-live]")
+    /**
+     * The live capsule belongs on the same flex row as the app's own working
+     * indicator ("Working"), so it reads next to the status text instead of
+     * far below it. The tail lane is only the fallback for rows without one,
+     * e.g. a pure thinking row.
+     */
+    const ensureLiveHost = (scroll) => {
+      const working = scroll.querySelector('[data-component="session-working"]')
+      if (working && working.parentElement) {
+        let host = working.parentElement.querySelector(":scope > [data-token-usage-live]")
+        if (!host) {
+          host = document.createElement("div")
+          host.className = "tu-live-status"
+          host.setAttribute("data-token-usage-live", "")
+          working.after(host)
+        }
+        return host
+      }
+
+      const spacer = scroll.querySelector('[data-timeline-row="bottom-spacer"]')
+      if (!spacer) return null
+      // Only a direct child counts here: a leftover inline host can live deeper
+      // inside the spacer (the activity lane), and reusing it would keep the
+      // capsule out of the tail lane.
+      let lane = spacer.querySelector(":scope > [data-token-usage-live]")
       if (!lane) {
         lane = document.createElement("div")
         lane.className = "tu-live-lane"
@@ -438,10 +461,7 @@ module.exports = Plugin.define({
         }
         const turnIds = Array.from(turns.keys())
         const activeTurnId = running ? turnIds[turnIds.length - 1] : null
-        const liveSpacer = running
-          ? scroll.querySelector('[data-timeline-row="bottom-spacer"]')
-          : null
-        const liveLane = liveSpacer ? ensureLiveLane(liveSpacer) : null
+        const liveHost = running ? ensureLiveHost(scroll) : null
 
         const byMessage = new Map()
         known = new Set(turns.keys())
@@ -504,7 +524,7 @@ module.exports = Plugin.define({
           }
 
           let target = null
-          if (active && liveLane) target = liveLane
+          if (active && liveHost) target = liveHost
           else if (row) target = contentTarget(row)
           if (!target) continue
 
