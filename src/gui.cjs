@@ -396,26 +396,30 @@ module.exports = Plugin.define({
     }
 
     /**
-     * The active turn's capsule lives in the composer dock as a normal flow
-     * child, immediately before the composer face. The app's composer pills
-     * (subagents, Goal, todos) are an absolute z-70 layer above the input; a
-     * capsule inside the timeline is painted under them and masked by the
-     * bottom fade. A flow child in the dock is measured with the dock, so the
-     * timeline inset follows and the pills sit above it instead of on top.
-     * Older builds without a composer face fall back to the timeline tail.
+     * The active turn's capsule lives in the composer dock as the first flow
+     * child of the z-70 column: above the queued-message panel and the
+     * composer morph. The queue panel's negative margin tucks it under the
+     * composer card, not over the capsule, and a morph flight (data-moving +
+     * overflow-clip) cannot clip a node outside the morph. The app's composer
+     * pills (subagents, Goal, todos) are an absolute z-70 layer above the
+     * input; a capsule inside the timeline is painted under them and masked
+     * by the bottom fade. A flow child in the dock is measured with the dock,
+     * so the timeline inset follows. Older builds without a composer face
+     * fall back to the timeline tail.
      */
     const ensureLiveHost = (scroll) => {
       const face = findComposerFace(scroll)
-      const column = face && face.parentElement
+      const morph = face && face.parentElement
+      const column = morph && morph.parentElement
       const dock = column && column.closest('[data-component="session-composer-dock"]')
-      if (face && column && dock) {
+      if (face && morph && column && dock) {
         let host = column.querySelector(":scope > [data-token-usage-live]")
         if (!host) {
           host = document.createElement("div")
           host.className = "tu-live-dock"
           host.setAttribute("data-token-usage-live", "")
-          column.insertBefore(host, face)
         }
+        if (column.firstElementChild !== host) column.prepend(host)
         return host
       }
 

@@ -21,6 +21,10 @@
   line below the app's subagent/Goal pills and above the input. The app's z-70 composer lane can no longer paint
   over it; the dock's ResizeObserver updates the timeline inset. It starts at zero, updates live, and moves under
   the turn when it settles. Completed turns keep their own capsules.
+- **Queue-safe live line.** The live capsule is the first flow child of the composer dock column, above the
+  queued-message panel and the composer morph. The queue's 12px tuck lands on the composer card, not on the
+  capsule, and face-flight clipping cannot reach it. It still starts at zero, updates live and returns under the
+  turn when the turn settles.
 - **Above the app's normal stacking contexts.** The details card is now a fixed body portal at z-index
   2147483000, above the timeline, later messages and the composer, so virtualized-row clipping and normal
   stacking contexts cannot cover or cut it.

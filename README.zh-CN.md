@@ -65,8 +65,8 @@
   请求次数、耗时和汇率来源。未钉住时卡片也能直接悬停（中间有看不见的 8px 悬停桥），点 ⓘ 可钉住卡片
   持续阅读/复制。卡片优先放在配置方向（默认左侧）的空白处，其次下方，最后上方；窗口够宽时不会覆盖本轮的 step 行，
   并自动夹在浏览器窗口可视区域内，滚动/缩放时跟随。
-- **执行中也有胶囊。** 思考或工具执行时，胶囊显示在输入框上方的 composer dock 独立一行：在应用的 subagent/Goal
-  胶囊下方、输入框上方，不再放进滚动时间线。从 0 实时更新，结束后归位到回复下方；已完成轮次保留各自胶囊。
+- **执行中也有胶囊。** 思考或工具执行时，胶囊位于 composer dock 中、排队消息面板和输入卡片上方；从 0 实时更新，
+  结束后归位到回复下方。已完成轮次保留各自胶囊。
 - **位于应用普通层叠之上。** 明细卡渲染到 `document.body` 的 fixed portal，z-index 为 2147483000，位于时间线、
   后续消息和输入区之上，普通层叠上下文无法遮住或裁掉它。应用自身的 modal/对话框仍可能盖在它上面。
 - **更容易对准。** 可见行本身是一块带内边距的胶囊，行尾有独立 ⓘ 按钮，点击热区比图标更大，不用再
@@ -278,7 +278,7 @@ user message
 2. 按前面的 user/synthetic 消息把 assistant 消息分组，累加 `tokens` 和 `cost`；
 3. 找到渲染出来的 assistant 内容容器（`[data-slot="session-turn-assistant-content"]`），把 footer 节点挂进去；
 4. 100ms 采样（空闲 1000ms）保持数据新鲜；`MutationObserver` 在应用重渲染时把 footer 挂回去；`requestAnimationFrame` 做数字动画；
-5. 应用把 `session.status` 报为 `running`（思考或工具执行）时，当前轮的 footer 作为普通流式子元素插到 `[data-component="session-composer-dock"]` 里、紧挨 `[data-slot="composer-face"]` 之前：应用的胶囊是输入框上方的 absolute z-70 层，所以这一行不会被盖住，dock 的 ResizeObserver 会同步时间线下边距；从 0 开始实时更新，本轮结束后归位到回复内容下方。明细卡是 `document.body` 级的 fixed portal（z-index 2147483000），优先配置方向（默认左侧），其次下方，最后上方；窗口隐藏时暂停采样。
+5. 应用把 `session.status` 报为 `running`（思考或工具执行）时，当前轮的 footer 成为 `[data-component="session-composer-dock"]` 里 `z-[70]` 列的**第一个流式子元素**，位于排队消息区（queue grow）和 `[data-slot="composer-morph"]` **上方**：排队面板的 12px 负外边距只会压到输入卡片上，不会压到胶囊；dock 的 ResizeObserver 会同步时间线下边距；morph 的面板飞行动画（`data-moving` + `overflow-clip`）裁不到 morph 之外的节点。从 0 开始实时更新，本轮结束后归位到回复内容下方。明细卡是 `document.body` 级的 fixed portal（z-index 2147483000），优先配置方向（默认左侧），其次下方，最后上方；窗口隐藏时暂停采样。
 
 GUI 插件 API 目前没有官方的「消息底部插槽」，所以最后一步是 DOM 注入。这是整个插件最脆的地方：未来
 OpenCode 如果改了 slot 名，footer 会消失（插件只打印一次警告），不会污染时间线。选择器和聚合逻辑分别隔离在

@@ -40,7 +40,9 @@ function placeTooltip(input) {
   const anchorLeft = Number.isFinite(anchor.left) ? anchor.left : 0
   const anchorRight = Number.isFinite(anchor.right) ? anchor.right : anchorLeft
   const infoRight =
-    input && input.info && Number.isFinite(input.info.right) ? input.info.right : anchorRight
+    input && input.info && Number.isFinite(input.info.right) && input.info.right > input.info.left
+      ? input.info.right
+      : anchorRight
   const popWidth = Math.max(0, Number(pop.width) || 0)
   const popHeight = Math.max(0, Number(pop.height) || 0)
 

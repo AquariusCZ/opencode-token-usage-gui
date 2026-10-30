@@ -717,7 +717,7 @@ function bindTooltip(entry, view) {
     window.addEventListener("resize", onResize)
     if (!followTimer) {
       followTimer = setInterval(() => {
-        if (open) position()
+        if (open && !document.hidden) position()
       }, 160)
     }
   }
@@ -759,7 +759,8 @@ function bindTooltip(entry, view) {
     const inSurface = root.contains(target) || portal.contains(target)
     const onInfo = document.activeElement === info
     const hovering = root.matches(":hover") || portal.matches(":hover")
-    if (!inSurface && !onInfo && !hovering) return
+    const plainTarget = target === document.body || target === document.documentElement
+    if (!inSurface && !onInfo && !hovering && !plainTarget) return
     event.stopPropagation()
     setPinned(false)
     hide(0)

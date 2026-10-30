@@ -431,7 +431,7 @@
         padding: 0 120px 18px;
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: 0;
         align-items: stretch;
         background: linear-gradient(to bottom, transparent, var(--bg) 30%);
       }
@@ -440,6 +440,7 @@
         display: flex;
         flex-direction: column;
         gap: 6px;
+        margin-bottom: 8px;
       }
 
       .live-dock [data-token-usage] {
@@ -458,6 +459,28 @@
         border-radius: 999px;
         padding: 1px 8px;
         background: var(--panel);
+      }
+
+      .mock-queue {
+        position: relative;
+        margin-bottom: -12px;
+        padding: 8px 12px 18px;
+        border-radius: 10px;
+        background: var(--panel);
+        box-shadow: inset 0 0 0 0.5px var(--line);
+      }
+
+      .mock-queue-row {
+        color: var(--muted);
+        font-size: 11.5px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .mock-queue-count {
+        color: var(--faint);
+        margin-right: 8px;
       }
 
       .composer {
@@ -1011,6 +1034,9 @@
                   </svg>
                 </button>
               </div>
+            </div>
+            <div class="mock-queue">
+              <div class="mock-queue-row"><span class="mock-queue-count">1 queued</span> Can you also check the release notes?</div>
             </div>
             <div class="composer">
               <div class="placeholder">Ask anything, / for commands, @ for context...</div>

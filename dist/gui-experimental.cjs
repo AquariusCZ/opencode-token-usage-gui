@@ -254,7 +254,7 @@ var require_placement = __commonJS({
       const anchorBottom = Number.isFinite(anchor.bottom) ? anchor.bottom : anchorTop;
       const anchorLeft = Number.isFinite(anchor.left) ? anchor.left : 0;
       const anchorRight = Number.isFinite(anchor.right) ? anchor.right : anchorLeft;
-      const infoRight = input && input.info && Number.isFinite(input.info.right) ? input.info.right : anchorRight;
+      const infoRight = input && input.info && Number.isFinite(input.info.right) && input.info.right > input.info.left ? input.info.right : anchorRight;
       const popWidth = Math.max(0, Number(pop.width) || 0);
       const popHeight = Math.max(0, Number(pop.height) || 0);
       const top = Number.isFinite(bounds.top) ? bounds.top : 0;
@@ -968,7 +968,7 @@ var require_footer = __commonJS({
         window.addEventListener("resize", onResize);
         if (!followTimer) {
           followTimer = setInterval(() => {
-            if (open) position();
+            if (open && !document.hidden) position();
           }, 160);
         }
       };
@@ -1006,7 +1006,8 @@ var require_footer = __commonJS({
         const inSurface = root.contains(target) || portal.contains(target);
         const onInfo = document.activeElement === info;
         const hovering = root.matches(":hover") || portal.matches(":hover");
-        if (!inSurface && !onInfo && !hovering) return;
+        const plainTarget = target === document.body || target === document.documentElement;
+        if (!inSurface && !onInfo && !hovering && !plainTarget) return;
         event.stopPropagation();
         setPinned(false);
         hide(0);
@@ -1473,16 +1474,17 @@ module.exports = Plugin.define({
     };
     const ensureLiveHost = (scroll) => {
       const face = findComposerFace(scroll);
-      const column = face && face.parentElement;
+      const morph = face && face.parentElement;
+      const column = morph && morph.parentElement;
       const dock = column && column.closest('[data-component="session-composer-dock"]');
-      if (face && column && dock) {
+      if (face && morph && column && dock) {
         let host = column.querySelector(":scope > [data-token-usage-live]");
         if (!host) {
           host = document.createElement("div");
           host.className = "tu-live-dock";
           host.setAttribute("data-token-usage-live", "");
-          column.insertBefore(host, face);
         }
+        if (column.firstElementChild !== host) column.prepend(host);
         return host;
       }
       const spacer = scroll.querySelector('[data-timeline-row="bottom-spacer"]');
