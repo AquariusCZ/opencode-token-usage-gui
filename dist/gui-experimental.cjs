@@ -1,4 +1,4 @@
-/*! opencode-token-usage-gui v0.3.0 | MIT | https://github.com/AquariusCZ/opencode-token-usage-gui */
+/*! opencode-token-usage-gui v0.3.1 | MIT | https://github.com/AquariusCZ/opencode-token-usage-gui */
 "use strict";
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
