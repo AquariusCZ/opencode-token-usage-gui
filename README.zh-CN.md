@@ -142,7 +142,7 @@ opencode plugin remove opencode-token-usage-gui
 | `detailed` | `false` | 在可见行里额外显示推理 token 和缓存写。 |
 | `showCost` | `true` | 显示每轮费用。 |
 | `animate` | `true` | 数字滚动动画；设 `false` 或 `tweenMs: 0` 可关闭。 |
-| `refreshMs` | `500` | 刷新间隔，限制在 200–5000ms。越小越新，但 CPU 越高。 |
+| `refreshMs` | `500` | 刷新间隔，限制在 16–5000ms。`16.67` 对应 60Hz，CPU 很高，仅建议实验。 |
 | `tweenMs` | `550` | 数字滚动时长，限制在 0–2000ms；`0` 表示直接跳。 |
 | `currency` | `"CNY"` | `"CNY"`、`"USD"` 或 `"auto"`；`auto` 在中文界面用人民币，其他语言用美元。 |
 | `usdToCny` | `6.68` | 数字表示手动汇率（不联网）；`"auto"` 表示每日自动汇率（见下）。 |
@@ -182,10 +182,12 @@ tooltip 会明确告诉你用的是哪种汇率：
 
 ### 刷新频率
 
-- `refreshMs` 默认 `500`，限制在 `200–5000`。越小数字越新，但 CPU 越高。
+- `refreshMs` 默认 `500`，限制在 `16–5000`。越小数字越新，但 CPU 越高；`16.67`（60Hz）会每帧读一次会话 store，仅建议实验。
 - `tweenMs` 默认 `550`，限制在 `0–2000`。设 `0`（或 `animate: false`）直接跳到目标值。
 - 窗口隐藏时定时器暂停，重新可见时立即刷新一次。
 - 应用重渲染时间线时，防抖的 `MutationObserver` 会把 footer 挂回去。
+- 在 Windows 11、约 200 条消息的会话上实测：`500` 约占单核 **1.6%**，`16.67`（60Hz）约占 **12.7%**（20 秒
+  `Get-Process` CPU 时间）。数字动画本来就是 `requestAnimationFrame` 的 60Hz，提高轮询频率不会让画面更顺。
 
 ### 显示模式
 

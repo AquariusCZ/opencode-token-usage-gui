@@ -152,7 +152,7 @@ Options go in the plugin entry of `opencode.json(c)`:
 | `detailed` | `false` | Also show reasoning tokens and cache writes on the visible line. |
 | `showCost` | `true` | Show the per-turn cost. |
 | `animate` | `true` | Tween the numbers instead of jumping. Set `false` or `tweenMs: 0` to snap. |
-| `refreshMs` | `500` | Refresh interval, clamped to 200–5000 ms. Lower is fresher but uses more CPU. |
+| `refreshMs` | `500` | Refresh interval, clamped to 16–5000 ms. `16.67` = 60 Hz; much higher CPU, intended for experiments. |
 | `tweenMs` | `550` | Count-up duration, clamped to 0–2000 ms. `0` disables the animation. |
 | `currency` | `"CNY"` | `"CNY"`, `"USD"`, or `"auto"`. `auto` uses CNY for a Chinese UI and USD otherwise. |
 | `usdToCny` | `6.68` | A number (manual rate, no network) or `"auto"` (daily cached rate; see below). |
@@ -192,10 +192,14 @@ Set `usdToCny` to your actual billing rate if you want the number to match your 
 
 ### Refresh rate
 
-- `refreshMs` defaults to `500` and is clamped to `200–5000`. Lower means fresher numbers; higher means less CPU.
+- `refreshMs` defaults to `500` and is clamped to `16–5000`. Lower means fresher numbers; higher means less CPU.
+  `16.67` (60 Hz) is allowed for experiments, but polls the session store every frame and is not recommended for normal use.
 - `tweenMs` defaults to `550` and is clamped to `0–2000`. Set `0` (or `animate: false`) to snap to the target.
 - The timer pauses while the window is hidden and refreshes immediately when it becomes visible again.
 - A debounced `MutationObserver` still reattaches the footer when the app re-renders the timeline.
+- Measured on a ~200-message session (Windows 11, OpenCode Desktop 2.2.3): `500` used about **1.6% of one CPU
+  core**; `16.67` (60 Hz) used about **12.7%** over the same 20-second window. The count-up animation is already
+  60 Hz via `requestAnimationFrame`, so a 60 Hz data poll buys no extra visual smoothness.
 
 ### Display modes
 
