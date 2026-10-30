@@ -70,6 +70,11 @@ numbers that actually change the bill.
   for persistent reading and copying. It prefers the free gutter to the right of the footer, then below it, then
   above, so it does not cover the turn's step rows on a wide window; it clamps to the timeline and repositions on
   scroll and resize.
+- **Live from the first token.** While a turn is thinking or running tools, its capsule is parked in the app's
+  86 px tail lane at the bottom of the timeline. It starts at zero and updates live, then moves under the turn
+  when the turn settles. Completed turns keep their own capsules.
+- **On the top layer.** The details card is rendered in a fixed body portal at z-index 2147483000, so later
+  conversation rows, virtualized-row clipping, and the timeline scroll container cannot cover or clip it.
 - **A footer you can hit.** The visible line is a padded pill with a dedicated info button whose hit area extends
   past the glyph; no need to land on a single 12 px line.
 - **Keyboard accessible.** Tab to the info button, press Enter or Space to pin, Escape or an outside click to close.
@@ -292,8 +297,10 @@ user message
    a footer node.
 4. A 100 ms sampler (1000 ms when idle) keeps values fresh; a `MutationObserver` re-attaches the footer when the
    app re-renders the timeline; `requestAnimationFrame` animates changes.
-5. Hovering the footer opens a card built from the same DOM node. It prefers the free space to the right of the
-   footer, then below, then above, and is clamped to the timeline viewport. The timer pauses while the window is
+5. While the app reports `session.status` as `running` (thinking or tools), the active turn's footer is parked in
+   the app's `[data-timeline-row="bottom-spacer"]` tail lane, starting at zero and updating live; when the turn
+   settles it moves into the assistant content. Hovering opens a card rendered into a fixed body portal at
+   z-index 2147483000, preferring the right gutter, then below, then above. The timer pauses while the window is
    hidden.
 
 There is no official message-footer slot in the GUI plugin API, so the last step is DOM injection. That is the
@@ -336,6 +343,10 @@ Yes: set `"currency": "USD"`. The card still shows the original USD amount when 
 **How do I keep the card open?**
 Click the small info button at the end of the footer. The pinned card is selectable, so you can copy numbers; click
 the button again, press Escape, or click outside to close it.
+
+**Why is the card never cut off by later messages?**
+It is rendered into a fixed portal on `document.body` at the maximum z-index, not inside the scrolling timeline
+row. Later messages, row clipping and the composer cannot paint over it.
 
 **Why is the cost zero?**
 The provider did not report a cost for that request. Free models and some local providers do not report one.

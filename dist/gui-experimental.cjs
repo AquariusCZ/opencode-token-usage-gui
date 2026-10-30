@@ -326,31 +326,6 @@ var require_footer = __commonJS({
 [${FOOTER_ATTR}][data-open="true"] {
   background: var(--v2-overlay-simple-overlay-hover, rgba(127, 127, 127, 0.08));
 }
-[${FOOTER_ATTR}][data-open]::before,
-[${FOOTER_ATTR}][data-open]::after {
-  content: "";
-  position: absolute;
-  left: -8px;
-  right: -8px;
-  height: 8px;
-}
-[${FOOTER_ATTR}][data-open]::before {
-  top: -8px;
-}
-[${FOOTER_ATTR}][data-open]::after {
-  bottom: -8px;
-}
-[${FOOTER_ATTR}][data-open][data-placement="right"]::before {
-  left: 100%;
-  right: auto;
-  top: -8px;
-  bottom: -8px;
-  width: 8px;
-  height: auto;
-}
-[${FOOTER_ATTR}][data-open][data-placement="right"]::after {
-  display: none;
-}
 [${FOOTER_ATTR}][data-pinned] {
   background: var(--v2-overlay-simple-overlay-pressed, rgba(127, 127, 127, 0.12));
 }
@@ -384,7 +359,8 @@ var require_footer = __commonJS({
   opacity: 0.4;
   user-select: none;
 }
-[${FOOTER_ATTR}] [hidden] {
+[${FOOTER_ATTR}] [hidden],
+.tu-portal [hidden] {
   display: none !important;
 }
 [${FOOTER_ATTR}] .tu-total .tu-val {
@@ -442,11 +418,24 @@ var require_footer = __commonJS({
   width: 12px;
   height: 12px;
 }
-[${FOOTER_ATTR}] .tu-pop {
-  position: absolute;
-  z-index: 60;
-  left: 0;
+.tu-portal {
+  position: fixed;
   top: 0;
+  left: 0;
+  z-index: 2147483000;
+  box-sizing: content-box;
+  width: max-content;
+  height: max-content;
+  padding: 8px;
+  pointer-events: none;
+  overflow: visible;
+  font-family: inherit;
+}
+.tu-portal[data-open="true"] {
+  pointer-events: auto;
+}
+.tu-portal .tu-pop {
+  position: relative;
   box-sizing: border-box;
   width: 348px;
   max-width: calc(100vw - 24px);
@@ -478,42 +467,39 @@ var require_footer = __commonJS({
     transform 170ms cubic-bezier(0.16, 1, 0.3, 1),
     visibility 0s linear 170ms;
 }
-[${FOOTER_ATTR}] .tu-pop[data-placement="bottom"] {
+.tu-portal .tu-pop[data-placement="bottom"] {
   transform: translateY(-4px) scale(0.985);
   transform-origin: top left;
 }
-[${FOOTER_ATTR}] .tu-pop[data-placement="right"] {
+.tu-portal .tu-pop[data-placement="right"] {
   transform: translateX(-4px) scale(0.985);
   transform-origin: left center;
 }
-[${FOOTER_ATTR}] .tu-pop[data-open="true"] {
+.tu-portal .tu-pop[data-open="true"] {
   opacity: 1;
   visibility: visible;
-  pointer-events: auto;
-  user-select: text;
-  -webkit-user-select: text;
-  transform: translateY(0) scale(1);
+  transform: none;
   transition-delay: 0s;
 }
-[${FOOTER_ATTR}][data-pinned] .tu-pop {
+.tu-portal[data-open="true"] .tu-pop {
   pointer-events: auto;
   user-select: text;
   -webkit-user-select: text;
 }
-[${FOOTER_ATTR}] .tu-pop[hidden] {
+.tu-portal .tu-pop[hidden] {
   display: none !important;
 }
-[${FOOTER_ATTR}] .tu-pop-head {
+.tu-portal .tu-pop-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 14px;
   margin-bottom: 11px;
 }
-[${FOOTER_ATTR}] .tu-pop-title {
+.tu-portal .tu-pop-title {
   min-width: 0;
 }
-[${FOOTER_ATTR}] .tu-eyebrow {
+.tu-portal .tu-eyebrow {
   display: block;
   margin-bottom: 3px;
   color: var(--v2-text-text-faint, #8a8a8a);
@@ -522,13 +508,13 @@ var require_footer = __commonJS({
   letter-spacing: 0.09em;
   text-transform: uppercase;
 }
-[${FOOTER_ATTR}] .tu-pop-total {
+.tu-portal .tu-pop-total {
   display: flex;
   align-items: baseline;
   gap: 5px;
   min-width: 0;
 }
-[${FOOTER_ATTR}] .tu-total-num {
+.tu-portal .tu-total-num {
   color: var(--v2-text-text-base, #f2f2f2);
   font-size: 20px;
   font-weight: 600;
@@ -536,17 +522,17 @@ var require_footer = __commonJS({
   letter-spacing: -0.02em;
   white-space: nowrap;
 }
-[${FOOTER_ATTR}] .tu-total-unit {
+.tu-portal .tu-total-unit {
   color: var(--v2-text-text-faint, #8a8a8a);
   font-size: 10.5px;
   white-space: nowrap;
 }
-[${FOOTER_ATTR}] .tu-cost-block {
+.tu-portal .tu-cost-block {
   flex: none;
   padding-top: 1px;
   text-align: right;
 }
-[${FOOTER_ATTR}] .tu-cost-main {
+.tu-portal .tu-cost-main {
   display: block;
   color: var(--v2-text-text-base, #f2f2f2);
   font-size: 14px;
@@ -555,14 +541,14 @@ var require_footer = __commonJS({
   letter-spacing: -0.01em;
   white-space: nowrap;
 }
-[${FOOTER_ATTR}] .tu-cost-alt {
+.tu-portal .tu-cost-alt {
   display: block;
   margin-top: 1px;
   color: var(--v2-text-text-faint, #8a8a8a);
   font-size: 10px;
   white-space: nowrap;
 }
-[${FOOTER_ATTR}] .tu-bar {
+.tu-portal .tu-bar {
   display: flex;
   gap: 2px;
   height: 6px;
@@ -571,7 +557,7 @@ var require_footer = __commonJS({
   background: var(--v2-background-bg-layer-03, rgba(127, 127, 127, 0.16));
   overflow: hidden;
 }
-[${FOOTER_ATTR}] .tu-seg {
+.tu-portal .tu-seg {
   display: block;
   height: 100%;
   border-radius: 2px;
@@ -579,85 +565,100 @@ var require_footer = __commonJS({
   min-width: 2px;
   transition: width 220ms ease;
 }
-[${FOOTER_ATTR}] .tu-seg[hidden] {
+.tu-portal .tu-seg[hidden] {
   display: none !important;
 }
-[${FOOTER_ATTR}] .tu-grid {
+.tu-portal .tu-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   column-gap: 16px;
   row-gap: 5px;
   margin: 0 0 10px;
 }
-[${FOOTER_ATTR}] .tu-cell {
+.tu-portal .tu-cell {
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
 }
-[${FOOTER_ATTR}] .tu-dot {
+.tu-portal .tu-dot {
   flex: none;
   width: 6px;
   height: 6px;
   border-radius: 2px;
   opacity: 0.9;
 }
-[${FOOTER_ATTR}] .tu-dot-ring {
+.tu-portal .tu-dot-ring {
   background: transparent !important;
   border: 1px solid var(--v2-text-text-muted, #a3a3a3);
   border-radius: 50%;
   opacity: 0.8;
 }
-[${FOOTER_ATTR}] .tu-cell-key {
+.tu-portal .tu-cell-key {
   color: var(--v2-text-text-muted, #a3a3a3);
   font-size: 11px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-[${FOOTER_ATTR}] .tu-cell-val {
+.tu-portal .tu-cell-val {
   margin-left: auto;
   color: var(--v2-text-text-base, #f2f2f2);
   font-size: 11.5px;
   font-weight: 500;
   white-space: nowrap;
 }
-[${FOOTER_ATTR}] .tu-pop-meta {
+.tu-portal .tu-pop-meta {
   padding-top: 9px;
   border-top: 1px solid var(--v2-border-border-muted, rgba(127, 127, 127, 0.16));
   color: var(--v2-text-text-muted, #a3a3a3);
   font-size: 10.5px;
 }
-[${FOOTER_ATTR}] .tu-pop-rate {
+.tu-portal .tu-pop-rate {
   margin-top: 2px;
   color: var(--v2-text-text-muted, #a3a3a3);
   font-size: 10px;
 }
-[${FOOTER_ATTR}] .tu-seg[data-metric="input"],
-[${FOOTER_ATTR}] .tu-dot[data-metric="input"] {
+.tu-portal .tu-seg[data-metric="input"],
+.tu-portal .tu-dot[data-metric="input"] {
   background: var(--v2-blue-500, #7698fd);
 }
-[${FOOTER_ATTR}] .tu-seg[data-metric="output"],
-[${FOOTER_ATTR}] .tu-dot[data-metric="output"] {
+.tu-portal .tu-seg[data-metric="output"],
+.tu-portal .tu-dot[data-metric="output"] {
   background: var(--v2-green-600, #49c970);
 }
-[${FOOTER_ATTR}] .tu-seg[data-metric="reasoning"],
-[${FOOTER_ATTR}] .tu-dot[data-metric="reasoning"] {
+.tu-portal .tu-seg[data-metric="reasoning"],
+.tu-portal .tu-dot[data-metric="reasoning"] {
   background: var(--v2-purple-500, #8271f8);
 }
-[${FOOTER_ATTR}] .tu-seg[data-metric="cacheRead"],
-[${FOOTER_ATTR}] .tu-dot[data-metric="cacheRead"] {
+.tu-portal .tu-seg[data-metric="cacheRead"],
+.tu-portal .tu-dot[data-metric="cacheRead"] {
   background: var(--v2-blue-300, #c3d4fd);
 }
-[${FOOTER_ATTR}] .tu-seg[data-metric="cacheWrite"],
-[${FOOTER_ATTR}] .tu-dot[data-metric="cacheWrite"] {
+.tu-portal .tu-seg[data-metric="cacheWrite"],
+.tu-portal .tu-dot[data-metric="cacheWrite"] {
   background: var(--v2-orange-600, #ff8648);
+}
+.tu-live-lane {
+  width: 100%;
+  max-width: var(--container-session, 744px);
+  margin-inline: auto;
+  padding-inline: 16px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  min-height: 29px;
+}
+@media (min-width: 768px) {
+  .tu-live-lane {
+    padding-inline: 24px;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   [${FOOTER_ATTR}],
-  [${FOOTER_ATTR}] .tu-pop,
-  [${FOOTER_ATTR}] .tu-pop[data-placement="bottom"],
-  [${FOOTER_ATTR}] .tu-pop[data-open="true"] {
+  .tu-portal .tu-pop,
+  .tu-portal .tu-pop[data-placement="bottom"],
+  .tu-portal .tu-pop[data-open="true"] {
     transition: none;
     transform: none;
   }
@@ -803,9 +804,12 @@ var require_footer = __commonJS({
       const meta = make("div", "tu-pop-meta");
       const rate = make("div", "tu-pop-rate");
       pop.append(meta, rate);
-      root.append(pop);
+      const portal = make("div", "tu-portal");
+      portal.append(pop);
+      document.body.append(portal);
       const entry = {
         root,
+        portal,
         values,
         groups,
         costEl,
@@ -891,7 +895,7 @@ var require_footer = __commonJS({
       if (entry.reposition && entry.isOpen()) entry.reposition();
     }
     function bindTooltip2(entry, view) {
-      const { root, info, pop } = entry;
+      const { root, info, pop, portal } = entry;
       let open = false;
       let pinned = false;
       let showTimer;
@@ -900,23 +904,15 @@ var require_footer = __commonJS({
       let onScroll = null;
       let onResize = null;
       let onOutside = null;
-      const bounds = () => {
-        const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
-        const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
-        let rect = null;
-        if (entry.scrollEl && entry.scrollEl.getBoundingClientRect) {
-          rect = entry.scrollEl.getBoundingClientRect();
-        }
-        return {
-          top: Math.max(0, rect ? rect.top : 0),
-          bottom: Math.min(viewportHeight, rect ? rect.bottom : viewportHeight),
-          left: Math.max(0, rect ? rect.left : 0),
-          right: Math.min(viewportWidth, rect ? rect.right : viewportWidth)
-        };
-      };
+      const hovered = () => root.matches(":hover") || portal.matches(":hover");
       const position = () => {
         if (!open || !root.isConnected) return;
-        const area2 = bounds();
+        const area2 = {
+          top: 0,
+          left: 0,
+          right: window.innerWidth || document.documentElement.clientWidth || 0,
+          bottom: window.innerHeight || document.documentElement.clientHeight || 0
+        };
         if (area2.right - area2.left < 140 || area2.bottom - area2.top < 120) return;
         pop.style.maxWidth = `${Math.max(160, area2.right - area2.left - 16)}px`;
         pop.style.maxHeight = `${Math.max(140, area2.bottom - area2.top - 16)}px`;
@@ -928,10 +924,10 @@ var require_footer = __commonJS({
           gap: 8,
           pad: 8
         });
-        pop.style.left = `${Math.round(result.left - anchor.left)}px`;
-        pop.style.top = `${Math.round(result.top - anchor.top)}px`;
+        portal.style.left = `${Math.round(result.left - 8)}px`;
+        portal.style.top = `${Math.round(result.top - 8)}px`;
         pop.dataset.placement = result.placement;
-        root.dataset.placement = result.placement;
+        portal.dataset.placement = result.placement;
       };
       const listen = () => {
         if (listening) return;
@@ -952,7 +948,7 @@ var require_footer = __commonJS({
       const attachOutside = () => {
         if (onOutside) return;
         onOutside = (event) => {
-          if (root.contains(event.target)) return;
+          if (root.contains(event.target) || portal.contains(event.target)) return;
           setPinned(false);
           hide(0);
         };
@@ -979,6 +975,7 @@ var require_footer = __commonJS({
           updateFooter2(entry, entry.turn, view);
           root.setAttribute("data-open", "true");
           pop.setAttribute("data-open", "true");
+          portal.setAttribute("data-open", "true");
           pop.setAttribute("aria-hidden", "false");
           info.setAttribute("aria-expanded", "true");
           listen();
@@ -993,6 +990,7 @@ var require_footer = __commonJS({
           open = false;
           root.removeAttribute("data-open");
           pop.removeAttribute("data-open");
+          portal.removeAttribute("data-open");
           pop.setAttribute("aria-hidden", "true");
           info.setAttribute("aria-expanded", "false");
           unlisten();
@@ -1007,7 +1005,7 @@ var require_footer = __commonJS({
           attachOutside();
         } else {
           detachOutside();
-          if (!root.matches(":hover") && !info.matches(":focus-visible")) hide(0);
+          if (!hovered() && !info.matches(":focus-visible")) hide(0);
         }
       }
       const onEnter = () => {
@@ -1020,6 +1018,15 @@ var require_footer = __commonJS({
         clearTimeout(showTimer);
         if (!pinned && !info.matches(":focus-visible")) hide(HIDE_DELAY_MS);
       };
+      const onPortalEnter = () => {
+        clearTimeout(showTimer);
+        clearTimeout(hideTimer);
+        if (!open) show();
+        else position();
+      };
+      const onPortalLeave = () => {
+        if (!pinned) hide(HIDE_DELAY_MS);
+      };
       const onClick = (event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -1029,7 +1036,7 @@ var require_footer = __commonJS({
       };
       const onFocus = () => show();
       const onBlur = () => {
-        if (!pinned && !root.matches(":hover")) hide(0);
+        if (!pinned && !hovered()) hide(0);
       };
       const onKeyDown = (event) => {
         if (event.key !== "Escape" || !open) return;
@@ -1046,6 +1053,8 @@ var require_footer = __commonJS({
       };
       root.addEventListener("pointerenter", onEnter);
       root.addEventListener("pointerleave", onLeave);
+      portal.addEventListener("pointerenter", onPortalEnter);
+      portal.addEventListener("pointerleave", onPortalLeave);
       info.addEventListener("click", onClick);
       info.addEventListener("focus", onFocus);
       info.addEventListener("blur", onBlur);
@@ -1060,10 +1069,13 @@ var require_footer = __commonJS({
         onRemove();
         root.removeEventListener("pointerenter", onEnter);
         root.removeEventListener("pointerleave", onLeave);
+        portal.removeEventListener("pointerenter", onPortalEnter);
+        portal.removeEventListener("pointerleave", onPortalLeave);
         info.removeEventListener("click", onClick);
         info.removeEventListener("focus", onFocus);
         info.removeEventListener("blur", onBlur);
         root.removeEventListener("keydown", onKeyDown);
+        portal.remove();
       };
       return entry;
     }
@@ -1379,6 +1391,16 @@ module.exports = Plugin.define({
       observedScroll = scroll;
       observer.observe(scroll, { childList: true, subtree: true });
     };
+    const ensureLiveLane = (spacer) => {
+      let lane = spacer.querySelector("[data-token-usage-live]");
+      if (!lane) {
+        lane = document.createElement("div");
+        lane.className = "tu-live-lane";
+        lane.setAttribute("data-token-usage-live", "");
+        spacer.append(lane);
+      }
+      return lane;
+    };
     const tick = (now) => {
       if (continuous) {
         const dt = lastFrame ? Math.max(0, now - lastFrame) : 16.67;
@@ -1437,6 +1459,21 @@ module.exports = Plugin.define({
         const info = data.session.get && data.session.get(session.id);
         const turns = buildTurns(messages, info && info.revert && info.revert.messageID);
         if (turns.size === 0) return;
+        const scroll = findScroll();
+        if (!scroll) return;
+        observe(scroll);
+        const statusApi = data.session && data.session.status;
+        let running = false;
+        if (typeof statusApi === "function") {
+          try {
+            running = statusApi.call(data.session, session.id) === "running";
+          } catch {
+          }
+        }
+        const turnIds = Array.from(turns.keys());
+        const activeTurnId = running ? turnIds[turnIds.length - 1] : null;
+        const liveSpacer = running ? scroll.querySelector('[data-timeline-row="bottom-spacer"]') : null;
+        const liveLane = liveSpacer ? ensureLiveLane(liveSpacer) : null;
         const byMessage = /* @__PURE__ */ new Map();
         known = new Set(turns.keys());
         for (const [turnId, turn] of turns) {
@@ -1445,11 +1482,8 @@ module.exports = Plugin.define({
             known.add(messageId);
           }
         }
-        const scroll = findScroll();
-        if (!scroll) return;
-        observe(scroll);
         const rows = collectRows(scroll);
-        if (rows.length === 0) return;
+        if (rows.length === 0 && !running) return;
         const chosen = /* @__PURE__ */ new Map();
         for (const row of rows) {
           const id = row.getAttribute("data-message-id");
@@ -1460,8 +1494,14 @@ module.exports = Plugin.define({
           if (!turn || turn.totals.total <= 0 && turn.cost <= 0) continue;
           chosen.set(turnId, row);
         }
+        if (running && activeTurnId && turns.has(activeTurnId) && !chosen.has(activeTurnId)) {
+          chosen.set(activeTurnId, null);
+        }
         for (const [turnId, row] of chosen) {
           const turn = turns.get(turnId);
+          if (!turn) continue;
+          const active = running && turnId === activeTurnId;
+          if (!active && turn.totals.total <= 0 && turn.cost <= 0) continue;
           const key = `${session.id}:${turnId}`;
           seen.add(key);
           let entry = state.get(key);
@@ -1479,12 +1519,18 @@ module.exports = Plugin.define({
             entry.scrollEl = scroll;
             applyTurn(entry, turn, view, animate);
           }
-          const target = contentTarget(row);
+          let target = null;
+          if (active && liveLane) target = liveLane;
+          else if (row) target = contentTarget(row);
+          if (!target) continue;
           if (entry.targetEl !== target || !entry.root.isConnected || entry.root.parentElement !== target) {
             target.appendChild(entry.root);
             entry.targetEl = target;
             if (entry.isOpen()) entry.reposition();
           }
+        }
+        for (const lane of scroll.querySelectorAll("[data-token-usage-live]")) {
+          if (!lane.firstChild) lane.remove();
         }
       } finally {
         for (const [key, entry] of state) {

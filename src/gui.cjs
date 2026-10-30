@@ -348,6 +348,17 @@ module.exports = Plugin.define({
       observer.observe(scroll, { childList: true, subtree: true })
     }
 
+    const ensureLiveLane = (spacer) => {
+      let lane = spacer.querySelector("[data-token-usage-live]")
+      if (!lane) {
+        lane = document.createElement("div")
+        lane.className = "tu-live-lane"
+        lane.setAttribute("data-token-usage-live", "")
+        spacer.append(lane)
+      }
+      return lane
+    }
+
     const tick = (now) => {
       if (continuous) {
         const dt = lastFrame ? Math.max(0, now - lastFrame) : 16.67
@@ -414,6 +425,24 @@ module.exports = Plugin.define({
         const turns = buildTurns(messages, info && info.revert && info.revert.messageID)
         if (turns.size === 0) return
 
+        const scroll = findScroll()
+        if (!scroll) return
+        observe(scroll)
+
+        const statusApi = data.session && data.session.status
+        let running = false
+        if (typeof statusApi === "function") {
+          try {
+            running = statusApi.call(data.session, session.id) === "running"
+          } catch {}
+        }
+        const turnIds = Array.from(turns.keys())
+        const activeTurnId = running ? turnIds[turnIds.length - 1] : null
+        const liveSpacer = running
+          ? scroll.querySelector('[data-timeline-row="bottom-spacer"]')
+          : null
+        const liveLane = liveSpacer ? ensureLiveLane(liveSpacer) : null
+
         const byMessage = new Map()
         known = new Set(turns.keys())
         for (const [turnId, turn] of turns) {
@@ -423,12 +452,8 @@ module.exports = Plugin.define({
           }
         }
 
-        const scroll = findScroll()
-        if (!scroll) return
-        observe(scroll)
-
         const rows = collectRows(scroll)
-        if (rows.length === 0) return
+        if (rows.length === 0 && !running) return
 
         const chosen = new Map()
         for (const row of rows) {
@@ -441,8 +466,15 @@ module.exports = Plugin.define({
           chosen.set(turnId, row)
         }
 
+        if (running && activeTurnId && turns.has(activeTurnId) && !chosen.has(activeTurnId)) {
+          chosen.set(activeTurnId, null)
+        }
+
         for (const [turnId, row] of chosen) {
           const turn = turns.get(turnId)
+          if (!turn) continue
+          const active = running && turnId === activeTurnId
+          if (!active && turn.totals.total <= 0 && turn.cost <= 0) continue
           const key = `${session.id}:${turnId}`
           seen.add(key)
 
@@ -462,7 +494,11 @@ module.exports = Plugin.define({
             applyTurn(entry, turn, view, animate)
           }
 
-          const target = contentTarget(row)
+          let target = null
+          if (active && liveLane) target = liveLane
+          else if (row) target = contentTarget(row)
+          if (!target) continue
+
           if (
             entry.targetEl !== target ||
             !entry.root.isConnected ||
@@ -472,6 +508,10 @@ module.exports = Plugin.define({
             entry.targetEl = target
             if (entry.isOpen()) entry.reposition()
           }
+        }
+
+        for (const lane of scroll.querySelectorAll("[data-token-usage-live]")) {
+          if (!lane.firstChild) lane.remove()
         }
       } finally {
         // Drop entries that no longer belong here. Same-session footers stay

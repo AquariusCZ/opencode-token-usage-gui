@@ -427,6 +427,19 @@
         padding-top: 3px;
       }
 
+      .working-block {
+        margin-top: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .working-label {
+        color: var(--v2-text-text-faint);
+        font-size: 12px;
+        letter-spacing: 0.01em;
+      }
+
       .composer-wrap {
         padding: 0 120px 18px;
         display: flex;
@@ -960,6 +973,25 @@
                   <div class="tu-pop-meta">21 model requests · 2m 15s</div>
                   <div class="tu-pop-rate">Exchange rate 6.68 · manual</div>
                 </div>
+              </div>
+            </div>
+
+            <div class="working-block">
+              <div class="working-label">工作中</div>
+              <div data-token-usage="" role="note" aria-live="off">
+                <span class="tu-label">This turn</span>
+                <span class="tu-group"><span class="tu-sep" aria-hidden="true">·</span><span class="tu-item"><span class="tu-key">Input</span><span class="tu-val">2,143</span></span></span>
+                <span class="tu-group"><span class="tu-sep" aria-hidden="true">·</span><span class="tu-item"><span class="tu-key">Output</span><span class="tu-val">512</span></span></span>
+                <span class="tu-group"><span class="tu-sep" aria-hidden="true">·</span><span class="tu-item"><span class="tu-key">Cache read</span><span class="tu-val">0</span></span></span>
+                <span class="tu-group"><span class="tu-sep" aria-hidden="true">·</span><span class="tu-item tu-total"><span class="tu-key">Total</span><span class="tu-val">2,655</span></span></span>
+                <span class="tu-cost-group"><span class="tu-sep" aria-hidden="true">·</span><span class="tu-cost">¥0.004</span></span>
+                <button class="tu-info" type="button" aria-label="Show token breakdown" aria-expanded="false">
+                  <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                    <circle cx="8" cy="8" r="6.3" fill="none" stroke="currentColor" stroke-width="1.25"></circle>
+                    <circle cx="8" cy="4.8" r="0.75" fill="currentColor"></circle>
+                    <path d="M8 7.2v4.1" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"></path>
+                  </svg>
+                </button>
               </div>
             </div>
           </section>

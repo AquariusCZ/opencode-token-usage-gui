@@ -65,6 +65,10 @@
   请求次数、耗时和汇率来源。未钉住时卡片也能直接悬停（中间有看不见的 8px 悬停桥），点 ⓘ 可钉住卡片
   持续阅读/复制。卡片优先放在 footer 右侧空白处，其次下方，最后上方；窗口够宽时不会覆盖本轮的 step 行，
   并自动夹在时间线可视区域内，滚动/缩放时跟随。
+- **执行中也有胶囊。** 思考或工具执行时，本轮胶囊停靠在时间线底部应用自带的 86px 尾部区域，从 0 开始实时更新；
+  本轮结束后自动归位到回复下方。已完成的轮次保留各自的胶囊。
+- **弹窗在最上层。** 明细卡渲染到 `document.body` 的 fixed portal，z-index 为 2147483000，后续对话、虚拟列表
+  行的裁剪和时间线滚动容器都无法盖住或裁掉它。
 - **更容易对准。** 可见行本身是一块带内边距的胶囊，行尾有独立 ⓘ 按钮，点击热区比图标更大，不用再
   精确地停在一条 12px 的细线上。
 - **键盘可用。** Tab 到 ⓘ，Enter / Space 钉住，Esc 或点击外部关闭；`prefers-reduced-motion` 下关闭过渡动画。
@@ -266,7 +270,7 @@ user message
 2. 按前面的 user/synthetic 消息把 assistant 消息分组，累加 `tokens` 和 `cost`；
 3. 找到渲染出来的 assistant 内容容器（`[data-slot="session-turn-assistant-content"]`），把 footer 节点挂进去；
 4. 100ms 采样（空闲 1000ms）保持数据新鲜；`MutationObserver` 在应用重渲染时把 footer 挂回去；`requestAnimationFrame` 做数字动画；
-5. 悬停 footer 时用同一个节点弹出明细卡：优先放在 footer 右侧空白处，其次下方，最后上方；窗口够宽时不会覆盖本轮的 step 行，并夹在时间线可视区域内；计时器在窗口隐藏时暂停。
+5. 应用把 `session.status` 报为 `running`（思考或工具执行）时，当前轮的 footer 放进 `[data-timeline-row="bottom-spacer"]` 里的 `.tu-live-lane`，从 0 开始实时更新；本轮结束后归位到回复内容下方。明细卡是 `document.body` 级的 fixed portal（z-index 2147483000），优先放在右侧空白处，其次下方，最后上方；窗口隐藏时暂停采样。
 
 GUI 插件 API 目前没有官方的「消息底部插槽」，所以最后一步是 DOM 注入。这是整个插件最脆的地方：未来
 OpenCode 如果改了 slot 名，footer 会消失（插件只打印一次警告），不会污染时间线。选择器和聚合逻辑分别隔离在
@@ -304,6 +308,9 @@ OpenCode 如果改了 slot 名，footer 会消失（插件只打印一次警告�
 
 **怎么让卡片一直开着？**
 点 footer 行尾的 ⓘ 按钮钉住。钉住后可以直接选中文字复制；再点一次、按 Esc 或点卡片外关闭。
+
+**为什么弹窗不会被下面的对话盖住？**
+卡片渲染在 `document.body` 的 fixed portal 里，使用最高层级，不在滚动行内部；后续消息、行裁剪和输入区都盖不到它。
 
 **为什么费用是 0？**
 该请求没有上报 cost。免费模型和部分本地 provider 会这样，token 统计不受影响。
