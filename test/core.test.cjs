@@ -14,6 +14,7 @@ const {
   formatMoney,
   formatPercent,
   normalizeCurrency,
+  normalizeRefreshMode,
   sameTotals,
   smoothingAlpha,
   tokenUsage,
@@ -195,6 +196,14 @@ test("normalizeCurrency resolves explicit and automatic modes", () => {
   assert.equal(normalizeCurrency("auto", "zh-CN"), "CNY")
   assert.equal(normalizeCurrency("auto", "en-US"), "USD")
   assert.equal(normalizeCurrency(undefined, "en-US"), "CNY")
+})
+
+test("normalizeRefreshMode exposes the continuous/interval switch", () => {
+  assert.equal(normalizeRefreshMode("interval"), "interval")
+  assert.equal(normalizeRefreshMode("INTERVAL"), "interval")
+  assert.equal(normalizeRefreshMode("continuous"), "continuous")
+  assert.equal(normalizeRefreshMode(undefined), "continuous")
+  assert.equal(normalizeRefreshMode("nonsense"), "continuous")
 })
 
 test("smoothingAlpha is frame-rate independent and bounded", () => {

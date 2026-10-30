@@ -39,6 +39,9 @@ var require_core = __commonJS({
       const a = Math.min(1, Math.max(0, finite2(alpha)));
       return finite2(current) + (finite2(target) - finite2(current)) * a;
     }
+    function normalizeRefreshMode2(value) {
+      return String(value || "continuous").toLowerCase() === "interval" ? "interval" : "continuous";
+    }
     function normalizeCurrency2(value, locale) {
       const code = String(value || "CNY").toUpperCase();
       if (code === "USD") return "USD";
@@ -206,6 +209,7 @@ var require_core = __commonJS({
       formatMoney: formatMoney2,
       formatPercent,
       normalizeCurrency: normalizeCurrency2,
+      normalizeRefreshMode: normalizeRefreshMode2,
       sameTotals: sameTotals2,
       smoothingAlpha: smoothingAlpha2,
       tokenUsage,
@@ -227,6 +231,7 @@ var {
   formatDuration,
   formatMoney,
   normalizeCurrency,
+  normalizeRefreshMode,
   sameTotals,
   smoothingAlpha
 } = require_core();
@@ -539,7 +544,7 @@ module.exports = Plugin.define({
     const compact = options.compact === true;
     const detailed = options.detailed === true;
     const showCost = options.showCost !== false;
-    const refreshMode = options.refreshMode === "interval" ? "interval" : "continuous";
+    const refreshMode = normalizeRefreshMode(options.refreshMode);
     const continuous = refreshMode === "continuous";
     const refreshMs = clampNumber(options.refreshMs, MIN_REFRESH_MS, MAX_REFRESH_MS, DEFAULT_REFRESH_MS);
     const tweenMs = clampNumber(options.tweenMs, 0, MAX_TWEEN_MS, DEFAULT_TWEEN_MS);

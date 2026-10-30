@@ -12,6 +12,7 @@ const {
   formatDuration,
   formatMoney,
   normalizeCurrency,
+  normalizeRefreshMode,
   sameTotals,
   smoothingAlpha,
 } = require("./core.cjs")
@@ -372,7 +373,7 @@ module.exports = Plugin.define({
     const compact = options.compact === true
     const detailed = options.detailed === true
     const showCost = options.showCost !== false
-    const refreshMode = options.refreshMode === "interval" ? "interval" : "continuous"
+    const refreshMode = normalizeRefreshMode(options.refreshMode)
     const continuous = refreshMode === "continuous"
     const refreshMs = clampNumber(options.refreshMs, MIN_REFRESH_MS, MAX_REFRESH_MS, DEFAULT_REFRESH_MS)
     const tweenMs = clampNumber(options.tweenMs, 0, MAX_TWEEN_MS, DEFAULT_TWEEN_MS)

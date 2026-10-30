@@ -53,6 +53,10 @@ function approachValue(current, target, alpha) {
  * Resolve the display currency. "auto" follows the UI language: Chinese gets
  * CNY, everything else gets USD (the app's native billing currency).
  */
+function normalizeRefreshMode(value) {
+  return String(value || "continuous").toLowerCase() === "interval" ? "interval" : "continuous"
+}
+
 function normalizeCurrency(value, locale) {
   const code = String(value || "CNY").toUpperCase()
   if (code === "USD") return "USD"
@@ -260,6 +264,7 @@ module.exports = {
   formatMoney,
   formatPercent,
   normalizeCurrency,
+  normalizeRefreshMode,
   sameTotals,
   smoothingAlpha,
   tokenUsage,
