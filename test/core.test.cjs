@@ -221,6 +221,31 @@ test("approachValue never overshoots and clamps alpha", () => {
   assert.equal(approachValue(0, 100, -1), 0)
 })
 
+test("continuous smoothing keeps moving when the target changes", () => {
+  const frame = 1000 / 60
+  const alpha = smoothingAlpha(frame, 250)
+  let value = 0
+
+  for (let i = 0; i < 6; i += 1) value = approachValue(value, 1000, alpha)
+  const beforeChange = value
+  const afterChange = approachValue(value, 1500, alpha)
+
+  assert.ok(beforeChange > 0, "the first target should move the value")
+  assert.ok(afterChange > beforeChange, "a new target must continue from the current value, not reset")
+  assert.ok(afterChange < 1500, "the filter must not jump straight to the new target")
+
+  // A 100 ms data cadence with a 60 Hz display should produce a monotonic rise.
+  let display = 0
+  let target = 1000
+  let previous = -1
+  for (let tick = 0; tick < 30; tick += 1) {
+    if (tick > 0 && tick % 6 === 0) target += 1000
+    display = approachValue(display, target, alpha)
+    assert.ok(display >= previous)
+    previous = display
+  }
+})
+
 test("formatters are stable and readable", () => {
   assert.equal(formatInt(1234.6, "en-US"), "1,235")
   assert.equal(formatPercent(39.2157, "en-US"), "39.2%")
