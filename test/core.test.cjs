@@ -43,6 +43,10 @@ function user(id) {
   return { id, type: "user" }
 }
 
+function idle(id, at = 0) {
+  return { id, type: "idle", outcome: "succeeded", time: { created: at } }
+}
+
 test("tokenUsage follows OpenCode's total formula", () => {
   const usage = tokenUsage({
     tokens: {
@@ -102,6 +106,7 @@ test("a turn aggregates every assistant request after one user message", () => {
       { input: 20, output: 2, reasoning: 1, cache: { read: 30, write: 4 } },
       { cost: 0.002, created: 3_000, completed: 4_000 },
     ),
+    idle("i1"),
     user("u2"),
     assistant(
       "a3",
@@ -134,7 +139,40 @@ test("a turn aggregates every assistant request after one user message", () => {
   assert.equal(second.requests, 1)
 })
 
-test("synthetic messages and steer messages start a new turn", () => {
+test("idle mode keeps synthetic notices and steers inside the running turn", () => {
+  const turns = buildTurns([
+    idle("i0"),
+    user("u1"),
+    assistant("a1", { input: 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } }),
+    { id: "s1", type: "synthetic" },
+    user("steer"),
+    assistant("a2", { input: 2, output: 2, reasoning: 0, cache: { read: 0, write: 0 } }),
+  ])
+
+  assert.equal(turns.size, 1)
+  assert.equal(turns.has("s1"), false)
+  assert.equal(turns.has("steer"), false)
+  assert.equal(turns.get("u1").totals.total, 6)
+  assert.equal(turns.get("u1").requests, 2)
+  assert.deepEqual(turns.get("u1").userIds, ["u1", "steer"])
+})
+
+test("without idle markers every user message starts a new turn", () => {
+  const turns = buildTurns([
+    user("u1"),
+    assistant("a1", { input: 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } }),
+    user("u2"),
+    assistant("a2", { input: 2, output: 2, reasoning: 0, cache: { read: 0, write: 0 } }),
+  ])
+
+  assert.equal(turns.size, 2)
+  assert.deepEqual(turns.get("u1").messageIds, ["a1"])
+  assert.equal(turns.get("u1").totals.total, 2)
+  assert.deepEqual(turns.get("u2").messageIds, ["a2"])
+  assert.equal(turns.get("u2").totals.total, 4)
+})
+
+test("a synthetic notice inside a running turn does not split it", () => {
   const turns = buildTurns([
     user("u1"),
     assistant("a1", { input: 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } }),
@@ -142,9 +180,155 @@ test("synthetic messages and steer messages start a new turn", () => {
     assistant("a2", { input: 2, output: 2, reasoning: 0, cache: { read: 0, write: 0 } }),
   ])
 
+  assert.equal(turns.size, 1)
+  assert.equal(turns.has("s1"), false)
+  assert.deepEqual(turns.get("u1").messageIds, ["a1", "a2"])
+  assert.equal(turns.get("u1").totals.total, 6)
+})
+
+test("an orphan synthetic notice owns the assistant usage that follows", () => {
+  const turns = buildTurns([
+    idle("i0"),
+    { id: "s1", type: "synthetic" },
+    assistant("a1", { input: 2, output: 3, reasoning: 0, cache: { read: 0, write: 0 } }),
+  ])
+
+  assert.equal(turns.size, 1)
+  assert.deepEqual(turns.get("s1").messageIds, ["a1"])
+  assert.equal(turns.get("s1").totals.total, 5)
+})
+
+test("an orphan compaction owns following usage but not its own cost", () => {
+  const turns = buildTurns([
+    {
+      id: "c1",
+      type: "compaction",
+      cost: 9,
+      tokens: { input: 1000, output: 1000, reasoning: 0, cache: { read: 0, write: 0 } },
+    },
+    assistant(
+      "a1",
+      { input: 3, output: 4, reasoning: 0, cache: { read: 0, write: 0 } },
+      { cost: 0.002 },
+    ),
+  ])
+
+  assert.equal(turns.size, 1)
+  assert.deepEqual(turns.get("c1").messageIds, ["a1"])
+  assert.equal(turns.get("c1").totals.total, 7)
+  assert.equal(turns.get("c1").cost, 0.002)
+})
+
+test("compaction inside an open turn is only a notice", () => {
+  const turns = buildTurns([
+    idle("i0"),
+    user("u1"),
+    assistant("a1", { input: 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } }),
+    {
+      id: "c1",
+      type: "compaction",
+      cost: 9,
+      tokens: { input: 1000, output: 1000, reasoning: 0, cache: { read: 0, write: 0 } },
+    },
+    assistant("a2", { input: 2, output: 2, reasoning: 0, cache: { read: 0, write: 0 } }),
+  ])
+
+  assert.equal(turns.size, 1)
+  assert.equal(turns.has("c1"), false)
+  assert.equal(turns.get("u1").totals.total, 6)
+})
+
+test("idle markers close a turn and the next user starts a new one", () => {
+  const turns = buildTurns([
+    user("u1"),
+    assistant(
+      "a1",
+      { input: 10, output: 5, reasoning: 0, cache: { read: 0, write: 0 } },
+      { created: 1_000, completed: 2_000 },
+    ),
+    idle("i1", 3_000),
+    user("u2"),
+    assistant(
+      "a2",
+      { input: 20, output: 5, reasoning: 0, cache: { read: 0, write: 0 } },
+      { created: 4_000, completed: 5_000 },
+    ),
+  ])
+
   assert.equal(turns.size, 2)
+  assert.equal(turns.get("u1").totals.total, 15)
+  assert.equal(turns.get("u2").totals.total, 25)
+  assert.equal(turns.get("u1").durationMs, 2_000)
+  assert.equal(turns.get("u2").durationMs, 1_000)
+})
+
+test("a pending queued prompt does not start a turn", () => {
+  const messages = [
+    user("u1"),
+    assistant("a1", { input: 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } }),
+    idle("i1", 2_000),
+    user("u2"),
+  ]
+
+  const pending = buildTurns(messages, undefined, new Set(["u2"]))
+  assert.equal(pending.size, 1)
+  assert.equal(pending.has("u2"), false)
+
+  const delivered = buildTurns(messages)
+  assert.equal(delivered.size, 2)
+  assert.equal(delivered.has("u2"), true)
+  assert.equal(delivered.get("u2").totals.total, 0)
+})
+
+test("a pending steer stays inside the running turn", () => {
+  const turns = buildTurns(
+    [
+      idle("i0"),
+      user("u1"),
+      assistant("a1", { input: 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } }),
+      user("u2"),
+    ],
+    undefined,
+    new Set(["u2"]),
+  )
+
+  assert.equal(turns.size, 1)
+  assert.equal(turns.has("u2"), false)
   assert.equal(turns.get("u1").totals.total, 2)
-  assert.equal(turns.get("s1").totals.total, 4)
+  assert.deepEqual(turns.get("u1").userIds, ["u1"])
+})
+
+test("a steer's usage is attributed to the turn opener", () => {
+  const turns = buildTurns([
+    idle("i0"),
+    user("u1"),
+    assistant("a1", { input: 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } }),
+    { id: "u2", type: "user", delivery: "steer" },
+    assistant("a2", { input: 2, output: 2, reasoning: 0, cache: { read: 0, write: 0 } }),
+  ])
+
+  assert.equal(turns.size, 1)
+  assert.equal(turns.get("u1").totals.total, 6)
+  assert.equal(turns.get("u1").requests, 2)
+  assert.deepEqual(turns.get("u1").messageIds, ["a1", "a2"])
+  assert.deepEqual(turns.get("u1").userIds, ["u1", "u2"])
+})
+
+test("summarizeTurns counts an open turn with usage and skips an open zero turn", () => {
+  const running = buildTurns([
+    user("u1"),
+    assistant("a1", { input: 3, output: 2, reasoning: 0, cache: { read: 5, write: 0 } }),
+  ])
+  const runningSummary = summarizeTurns(running)
+  assert.equal(runningSummary.turns, 1)
+  assert.equal(runningSummary.totals.total, 10)
+  assert.equal(runningSummary.requests, 1)
+
+  const queued = buildTurns([user("u2")])
+
+  const queuedSummary = summarizeTurns(queued)
+  assert.equal(queuedSummary.turns, 0)
+  assert.equal(queuedSummary.totals.total, 0)
 })
 
 test("assistant messages before the first user message are ignored", () => {
@@ -451,6 +635,7 @@ test("buildTurns handles a long session quickly", () => {
         }),
       )
     }
+    messages.push(idle(`i${turn}`))
   }
 
   const started = performance.now()

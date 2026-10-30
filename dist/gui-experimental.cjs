@@ -123,7 +123,8 @@ var require_core = __commonJS({
         endedAt: 0,
         durationMs: 0,
         cacheHitRate: null,
-        messageIds: []
+        messageIds: [],
+        userIds: []
       };
     }
     function visibleMessages(messages, revertMessageID) {
@@ -133,14 +134,58 @@ var require_core = __commonJS({
       if (boundary === -1) return [];
       return messages.slice(0, boundary);
     }
-    function buildTurns2(messages, revertMessageID) {
+    function buildTurns2(messages, revertMessageID, pendingInputIDs) {
       const turns = /* @__PURE__ */ new Map();
+      const pending = pendingInputIDs && typeof pendingInputIDs.has === "function" ? pendingInputIDs : Array.isArray(pendingInputIDs) ? new Set(pendingInputIDs) : null;
+      const visible = visibleMessages(messages, revertMessageID);
+      let firstIdle = -1;
+      for (let index = 0; index < visible.length; index += 1) {
+        const message = visible[index];
+        if (message && typeof message === "object" && message.type === "idle") {
+          firstIdle = index;
+          break;
+        }
+      }
       let current = null;
-      for (const message of visibleMessages(messages, revertMessageID)) {
+      const openTurn = (id) => {
+        current = id;
+        let turn = turns.get(id);
+        if (!turn) {
+          turn = emptyTurn(id);
+          turns.set(id, turn);
+        }
+        if (id && !turn.userIds.includes(id)) turn.userIds.push(id);
+        return turn;
+      };
+      for (let index = 0; index < visible.length; index += 1) {
+        const message = visible[index];
         if (!message || typeof message !== "object") continue;
-        if (message.type === "user" || message.type === "synthetic") {
-          current = message.id;
-          if (!turns.has(current)) turns.set(current, emptyTurn(current));
+        if (message.type === "idle") {
+          if (!current) continue;
+          const turn2 = turns.get(current);
+          if (turn2) {
+            const created2 = finite2(message.time && message.time.created);
+            if (created2 > 0 && created2 > turn2.endedAt) turn2.endedAt = created2;
+          }
+          current = null;
+          continue;
+        }
+        if (message.type === "system") continue;
+        const idleMode = firstIdle !== -1 && index > firstIdle;
+        if (message.type === "synthetic" || message.type === "compaction") {
+          if (!current) openTurn(message.id);
+          continue;
+        }
+        if (message.type === "user") {
+          if (pending && message.id && pending.has(message.id)) continue;
+          if (idleMode && current) {
+            const turn2 = turns.get(current);
+            if (turn2 && message.id && !turn2.userIds.includes(message.id)) {
+              turn2.userIds.push(message.id);
+            }
+            continue;
+          }
+          openTurn(message.id);
           continue;
         }
         if (message.type !== "assistant" || !current) continue;
@@ -709,6 +754,7 @@ var require_footer = __commonJS({
     padding-inline: 24px;
   }
 }
+/* Historical class name: this dock now hosts the session summary capsule. */
 .tu-live-dock {
   width: 100%;
   display: flex;
@@ -785,7 +831,7 @@ var require_footer = __commonJS({
       root.setAttribute("aria-live", "off");
       const values = {};
       const groups = {};
-      root.append(make("span", "tu-label", turn && turn.session ? copy.session : copy.turn));
+      root.append(make("span", "tu-label", turn && turn.session ? copy.session : copy.turnLabel));
       const item = (key, text, className) => {
         const group = make("span", "tu-group");
         const wrap = make("span", className ? `tu-item ${className}` : "tu-item");
@@ -955,7 +1001,10 @@ var require_footer = __commonJS({
       entry.hitCell.hidden = hit === null;
       setText2(entry.hitValue, hit === null ? "\u2014" : view.percent(hit));
       const parts = [];
-      if (turn.session && turn.turns > 0) parts.push(`${view.int(turn.turns)} ${copy.turns}`);
+      if (turn.session && turn.turns > 0) {
+        const unit = turn.turns === 1 ? copy.turn : copy.turns;
+        parts.push(`${view.int(turn.turns)} ${unit}`);
+      }
       parts.push(`${view.int(turn.requests)} ${copy.requests}`);
       if (turn.durationMs > 0) parts.push(formatDuration(turn.durationMs));
       if (turn.session && turn.partial) parts.push(copy.loaded);
@@ -1225,7 +1274,8 @@ var FX_TTL_MS = 24 * 60 * 60 * 1e3;
 var FX_TIMEOUT_MS = 8e3;
 var COPY = {
   en: {
-    turn: "This turn",
+    turnLabel: "This turn",
+    turn: "turn",
     session: "Session",
     input: "Input",
     output: "Output",
@@ -1249,7 +1299,8 @@ var COPY = {
     hideDetails: "Hide token breakdown"
   },
   zh: {
-    turn: "\u672C\u8F6E",
+    turnLabel: "\u672C\u8F6E",
+    turn: "\u8F6E",
     session: "\u672C\u6B21\u4F1A\u8BDD",
     input: "\u8F93\u5165",
     output: "\u8F93\u51FA",
@@ -1354,30 +1405,20 @@ function findComposerFace(scroll) {
   if (faces.length === 0) return null;
   return faces.reduce((best, item) => area(item) > area(best) ? item : best, faces[0]);
 }
-var hasVisibleQueue = (scroll) => {
-  const panel = scroll && scroll.closest ? scroll.closest('[data-slot="session-chat-panel"]') : null;
-  const scope = panel || document;
-  return Array.from(scope.querySelectorAll('[data-component="session-queue-panel"]')).some(
-    (element) => isVisible(element) && Boolean(element.querySelector('[data-component="session-queue-row"]'))
-  );
-};
-var pendingWarned = false;
-var hasPendingQueue = (session) => {
+var readPendingInputIds = (session) => {
   const data = session && session.server && session.server.data;
   const api = data && data.session && data.session.pending;
-  if (!api || typeof api.list !== "function") return false;
+  if (!api || typeof api.list !== "function") return null;
   try {
     const items = api.list(session.id);
-    return Array.isArray(items) && items.some((item) => item && item.type !== "synthetic");
-  } catch (error) {
-    if (!pendingWarned) {
-      pendingWarned = true;
-      console.warn(
-        "[token-usage-gui] could not read the pending queue; hiding the session summary",
-        error
-      );
+    if (!Array.isArray(items)) return null;
+    const ids = /* @__PURE__ */ new Set();
+    for (const item of items) {
+      if (item && item.type === "user" && item.id) ids.add(item.id);
     }
-    return true;
+    return ids;
+  } catch {
+    return null;
   }
 };
 function contentTarget(row) {
@@ -1553,38 +1594,7 @@ module.exports = Plugin.define({
       observedScroll = scroll;
       observer.observe(scroll, { childList: true, subtree: true });
     };
-    let queueObserver = null;
-    let observedDock = null;
-    const onDockMutation = () => {
-      if (mutationTimer) return;
-      mutationTimer = setTimeout(() => {
-        mutationTimer = void 0;
-        refresh();
-      }, MUTATION_DELAY_MS);
-    };
-    const observeDock = (scroll) => {
-      if (typeof MutationObserver === "undefined") return;
-      if (!queueObserver) queueObserver = new MutationObserver(onDockMutation);
-      const face = findComposerFace(scroll);
-      const dock = face && face.closest('[data-component="session-composer-dock"]') || document.querySelector('[data-component="session-composer-dock"]');
-      if (!dock) {
-        if (observedDock) {
-          queueObserver.disconnect();
-          observedDock = null;
-        }
-        return;
-      }
-      if (observedDock === dock) return;
-      queueObserver.disconnect();
-      observedDock = dock;
-      queueObserver.observe(dock, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ["hidden", "style", "class"]
-      });
-    };
-    const ensureLiveHost = (scroll) => {
+    const ensureSummaryHost = (scroll) => {
       const face = findComposerFace(scroll);
       const morph = face && face.parentElement;
       const column = morph && morph.parentElement;
@@ -1657,7 +1667,6 @@ module.exports = Plugin.define({
       let sessionId = null;
       let known = null;
       let running = false;
-      let activeTurnId = null;
       try {
         const session = ctx.sessions.current();
         if (!session || !session.id) return;
@@ -1668,12 +1677,16 @@ module.exports = Plugin.define({
         const messages = messagesApi.list(session.id);
         if (!Array.isArray(messages) || messages.length === 0) return;
         const info = data.session.get && data.session.get(session.id);
-        const turns = buildTurns(messages, info && info.revert && info.revert.messageID);
+        const pendingInputIds = readPendingInputIds(session) || void 0;
+        const turns = buildTurns(
+          messages,
+          info && info.revert && info.revert.messageID,
+          pendingInputIds
+        );
         if (turns.size === 0) return;
         const scroll = findScroll();
         if (!scroll) return;
         observe(scroll);
-        observeDock(scroll);
         const statusApi = data.session && data.session.status;
         running = false;
         if (typeof statusApi === "function") {
@@ -1682,8 +1695,6 @@ module.exports = Plugin.define({
           } catch {
           }
         }
-        const turnIds = Array.from(turns.keys());
-        activeTurnId = running ? turnIds[turnIds.length - 1] : null;
         const summary = summarizeTurns(turns);
         const ledger = emptyTotals();
         let ledgerOk = false;
@@ -1701,11 +1712,11 @@ module.exports = Plugin.define({
           }
         } catch {
         }
-        if (ledgerOk) {
+        if (ledgerOk && ledger.total > 0) {
           summary.totals = ledger;
           summary.cacheHitRate = cacheHitRate(ledger);
         }
-        if (info && Number.isFinite(Number(info.cost))) {
+        if (info && Number.isFinite(Number(info.cost)) && Number(info.cost) > 0) {
           try {
             summary.cost = typeof data.session.cost === "function" ? finite(data.session.cost(session.id)) : finite(info.cost);
           } catch {
@@ -1717,15 +1728,17 @@ module.exports = Plugin.define({
         } catch {
           summary.partial = !ledgerOk;
         }
-        const hasSummary = !running && !hasVisibleQueue(scroll) && !hasPendingQueue(session) && (summary.totals.total > 0 || summary.cost > 0);
-        const liveHost = running || hasSummary ? ensureLiveHost(scroll) : null;
+        const hasSummary = summary.totals.total > 0 || summary.cost > 0;
+        const summaryHost = hasSummary ? ensureSummaryHost(scroll) : null;
+        const byUser = /* @__PURE__ */ new Map();
         const byMessage = /* @__PURE__ */ new Map();
-        known = new Set(turns.keys());
+        known = /* @__PURE__ */ new Set();
         for (const [turnId, turn] of turns) {
-          for (const messageId of turn.messageIds) {
-            byMessage.set(messageId, turnId);
-            known.add(messageId);
-          }
+          for (const userId of turn.userIds || []) byUser.set(userId, turnId);
+          for (const messageId of turn.messageIds) byMessage.set(messageId, turnId);
+          known.add(turnId);
+          for (const id of turn.userIds || []) known.add(id);
+          for (const id of turn.messageIds) known.add(id);
         }
         const rows = collectRows(scroll);
         if (rows.length === 0 && !running && !hasSummary) return;
@@ -1733,29 +1746,15 @@ module.exports = Plugin.define({
         for (const row of rows) {
           const id = row.getAttribute("data-message-id");
           if (!id) continue;
-          const turnId = turns.has(id) ? id : byMessage.get(id);
+          const turnId = turns.has(id) ? id : byUser.get(id) || byMessage.get(id);
           if (!turnId) continue;
           const turn = turns.get(turnId);
           if (!turn || turn.totals.total <= 0 && turn.cost <= 0) continue;
           chosen.set(turnId, row);
         }
-        if (running && activeTurnId && turns.has(activeTurnId) && !chosen.has(activeTurnId)) {
-          chosen.set(activeTurnId, null);
-        }
         for (const [turnId, row] of chosen) {
           const turn = turns.get(turnId);
           if (!turn) continue;
-          const active = running && turnId === activeTurnId;
-          if (!active && turn.totals.total <= 0 && turn.cost <= 0) {
-            const staleKey = `${session.id}:${turnId}`;
-            const staleEntry = state.get(staleKey);
-            if (staleEntry) {
-              state.delete(staleKey);
-              if (staleEntry.dispose) staleEntry.dispose();
-              staleEntry.root.remove();
-            }
-            continue;
-          }
           const key = `${session.id}:${turnId}`;
           seen.add(key);
           let entry = state.get(key);
@@ -1773,9 +1772,7 @@ module.exports = Plugin.define({
             entry.scrollEl = scroll;
             applyTurn(entry, turn, view, animate);
           }
-          const useLive = Boolean(active && liveHost);
-          entry.docked = useLive;
-          const target = useLive ? liveHost : row ? contentTarget(row) : null;
+          const target = row ? contentTarget(row) : null;
           if (!target) continue;
           if (entry.targetEl !== target || !entry.root.isConnected || entry.root.parentElement !== target) {
             target.appendChild(entry.root);
@@ -1783,7 +1780,7 @@ module.exports = Plugin.define({
             if (entry.isOpen()) entry.reposition();
           }
         }
-        if (hasSummary && liveHost) {
+        if (hasSummary && summaryHost) {
           const key = `${session.id}:__summary__`;
           seen.add(key);
           let entry = state.get(key);
@@ -1802,9 +1799,9 @@ module.exports = Plugin.define({
             entry.scrollEl = scroll;
             applyTurn(entry, summary, view, animate);
           }
-          if (entry.targetEl !== liveHost || entry.root.parentElement !== liveHost) {
-            liveHost.appendChild(entry.root);
-            entry.targetEl = liveHost;
+          if (entry.targetEl !== summaryHost || entry.root.parentElement !== summaryHost) {
+            summaryHost.appendChild(entry.root);
+            entry.targetEl = summaryHost;
             if (entry.isOpen()) entry.reposition();
           }
         }
@@ -1822,8 +1819,6 @@ module.exports = Plugin.define({
             }
           }
           if (entry.sessionSummary && !known) stale = true;
-          const turnId = key.slice(`${sessionId}:`.length);
-          if (entry.docked && running && turnId === activeTurnId) stale = false;
           if (!stale) continue;
           state.delete(key);
           if (entry.dispose) entry.dispose();
@@ -1935,7 +1930,6 @@ module.exports = Plugin.define({
       if (mutationTimer) clearTimeout(mutationTimer);
       if (frame !== void 0) cancelAnimationFrame(frame);
       if (observer) observer.disconnect();
-      if (queueObserver) queueObserver.disconnect();
       document.removeEventListener("visibilitychange", onVisibilityChange);
       for (const entry of state.values()) {
         if (entry.dispose) entry.dispose();

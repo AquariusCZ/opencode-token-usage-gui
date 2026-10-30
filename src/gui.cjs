@@ -48,7 +48,8 @@ const FX_TIMEOUT_MS = 8000
 
 const COPY = {
   en: {
-    turn: "This turn",
+    turnLabel: "This turn",
+    turn: "turn",
     session: "Session",
     input: "Input",
     output: "Output",
@@ -72,7 +73,8 @@ const COPY = {
     hideDetails: "Hide token breakdown",
   },
   zh: {
-    turn: "本轮",
+    turnLabel: "本轮",
+    turn: "轮",
     session: "本次会话",
     input: "输入",
     output: "输出",
@@ -198,45 +200,24 @@ function findComposerFace(scroll) {
 }
 
 /**
- * True while a composer's queue panel in the active session pane is on screen
- * and has at least one row. The panel stays mounted (hidden) with no rows when
- * the queue is empty, and other panes may be mounted at the same time.
+ * Ids of user messages still waiting in the session queue. `id` is the
+ * optimistic message id, so it matches the transcript row that will appear
+ * once the prompt is delivered. Returns null when the queue cannot be read.
  */
-const hasVisibleQueue = (scroll) => {
-  const panel = scroll && scroll.closest ? scroll.closest('[data-slot="session-chat-panel"]') : null
-  const scope = panel || document
-  return Array.from(scope.querySelectorAll('[data-component="session-queue-panel"]')).some(
-    (element) =>
-      isVisible(element) && Boolean(element.querySelector('[data-component="session-queue-row"]')),
-  )
-}
-
-let pendingWarned = false
-
-/**
- * True while the session has a prompt waiting to run, whether or not its queue
- * panel is mounted or visible (closed dock, a question/elicitation blocking the
- * composer). Synthetic prompts are not user work and do not count.
- *
- * If the pending API exists but cannot be read, assume work is pending: hiding
- * a summary is cheaper than showing a stale total over a running queue.
- */
-const hasPendingQueue = (session) => {
+const readPendingInputIds = (session) => {
   const data = session && session.server && session.server.data
   const api = data && data.session && data.session.pending
-  if (!api || typeof api.list !== "function") return false
+  if (!api || typeof api.list !== "function") return null
   try {
     const items = api.list(session.id)
-    return Array.isArray(items) && items.some((item) => item && item.type !== "synthetic")
-  } catch (error) {
-    if (!pendingWarned) {
-      pendingWarned = true
-      console.warn(
-        "[token-usage-gui] could not read the pending queue; hiding the session summary",
-        error,
-      )
+    if (!Array.isArray(items)) return null
+    const ids = new Set()
+    for (const item of items) {
+      if (item && item.type === "user" && item.id) ids.add(item.id)
     }
-    return true
+    return ids
+  } catch {
+    return null
   }
 }
 
@@ -450,49 +431,8 @@ module.exports = Plugin.define({
     }
 
     /**
-     * Queue rows live in the composer dock, outside the timeline observer.
-     * Watching the dock subtree makes a queued prompt appearing or disappearing
-     * refresh the summary within the same debounce instead of the idle sample.
-     * Scope the dock to the active pane's composer face so a secondary pane's
-     * dock cannot drive the refresh.
-     */
-    let queueObserver = null
-    let observedDock = null
-    const onDockMutation = () => {
-      if (mutationTimer) return
-      mutationTimer = setTimeout(() => {
-        mutationTimer = undefined
-        refresh()
-      }, MUTATION_DELAY_MS)
-    }
-    const observeDock = (scroll) => {
-      if (typeof MutationObserver === "undefined") return
-      if (!queueObserver) queueObserver = new MutationObserver(onDockMutation)
-      const face = findComposerFace(scroll)
-      const dock =
-        (face && face.closest('[data-component="session-composer-dock"]')) ||
-        document.querySelector('[data-component="session-composer-dock"]')
-      if (!dock) {
-        if (observedDock) {
-          queueObserver.disconnect()
-          observedDock = null
-        }
-        return
-      }
-      if (observedDock === dock) return
-      queueObserver.disconnect()
-      observedDock = dock
-      queueObserver.observe(dock, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ["hidden", "style", "class"],
-      })
-    }
-
-    /**
-     * The active turn's capsule lives in the composer dock as the first flow
-     * child of the z-70 column: above the queued-message panel and the
+     * The session summary capsule lives in the composer dock as the first
+     * flow child of the z-70 column: above the queued-message panel and the
      * composer morph. The queue panel's negative margin tucks it under the
      * composer card, not over the capsule, and a morph flight (data-moving +
      * overflow-clip) cannot clip a node outside the morph. The app's composer
@@ -502,7 +442,7 @@ module.exports = Plugin.define({
      * so the timeline inset follows. Older builds without a composer face
      * fall back to the timeline tail.
      */
-    const ensureLiveHost = (scroll) => {
+    const ensureSummaryHost = (scroll) => {
       const face = findComposerFace(scroll)
       const morph = face && face.parentElement
       const column = morph && morph.parentElement
@@ -588,7 +528,6 @@ module.exports = Plugin.define({
       let sessionId = null
       let known = null
       let running = false
-      let activeTurnId = null
       try {
         const session = ctx.sessions.current()
         if (!session || !session.id) return
@@ -602,13 +541,17 @@ module.exports = Plugin.define({
         if (!Array.isArray(messages) || messages.length === 0) return
 
         const info = data.session.get && data.session.get(session.id)
-        const turns = buildTurns(messages, info && info.revert && info.revert.messageID)
+        const pendingInputIds = readPendingInputIds(session) || undefined
+        const turns = buildTurns(
+          messages,
+          info && info.revert && info.revert.messageID,
+          pendingInputIds,
+        )
         if (turns.size === 0) return
 
         const scroll = findScroll()
         if (!scroll) return
         observe(scroll)
-        observeDock(scroll)
 
         const statusApi = data.session && data.session.status
         running = false
@@ -617,8 +560,6 @@ module.exports = Plugin.define({
             running = statusApi.call(data.session, session.id) === "running"
           } catch {}
         }
-        const turnIds = Array.from(turns.keys())
-        activeTurnId = running ? turnIds[turnIds.length - 1] : null
         const summary = summarizeTurns(turns)
 
         // The loaded message list is only the current window (20/40 messages),
@@ -645,11 +586,15 @@ module.exports = Plugin.define({
             }
           }
         } catch {}
-        if (ledgerOk) {
+        // `info.tokens` is fed by an ephemeral usage.updated event, so on the
+        // first step it can still be zero while the loaded transcript already
+        // has the message usage. Keep the transcript totals until the ledger
+        // actually reports tokens, otherwise the summary disappears.
+        if (ledgerOk && ledger.total > 0) {
           summary.totals = ledger
           summary.cacheHitRate = cacheHitRate(ledger)
         }
-        if (info && Number.isFinite(Number(info.cost))) {
+        if (info && Number.isFinite(Number(info.cost)) && Number(info.cost) > 0) {
           try {
             summary.cost =
               typeof data.session.cost === "function"
@@ -668,20 +613,21 @@ module.exports = Plugin.define({
           summary.partial = !ledgerOk
         }
 
-        const hasSummary =
-          !running &&
-          !hasVisibleQueue(scroll) &&
-          !hasPendingQueue(session) &&
-          (summary.totals.total > 0 || summary.cost > 0)
-        const liveHost = running || hasSummary ? ensureLiveHost(scroll) : null
+        const hasSummary = summary.totals.total > 0 || summary.cost > 0
+        const summaryHost = hasSummary ? ensureSummaryHost(scroll) : null
 
+        // Assistant rows in a turn carry the latest user message id, so after a
+        // delivered steer their data-message-id is the steer id, not the
+        // assistant id. Map both kinds of ids back to the turn that owns them.
+        const byUser = new Map()
         const byMessage = new Map()
-        known = new Set(turns.keys())
+        known = new Set()
         for (const [turnId, turn] of turns) {
-          for (const messageId of turn.messageIds) {
-            byMessage.set(messageId, turnId)
-            known.add(messageId)
-          }
+          for (const userId of turn.userIds || []) byUser.set(userId, turnId)
+          for (const messageId of turn.messageIds) byMessage.set(messageId, turnId)
+          known.add(turnId)
+          for (const id of turn.userIds || []) known.add(id)
+          for (const id of turn.messageIds) known.add(id)
         }
 
         const rows = collectRows(scroll)
@@ -691,31 +637,16 @@ module.exports = Plugin.define({
         for (const row of rows) {
           const id = row.getAttribute("data-message-id")
           if (!id) continue
-          const turnId = turns.has(id) ? id : byMessage.get(id)
+          const turnId = turns.has(id) ? id : byUser.get(id) || byMessage.get(id)
           if (!turnId) continue
           const turn = turns.get(turnId)
           if (!turn || (turn.totals.total <= 0 && turn.cost <= 0)) continue
           chosen.set(turnId, row)
         }
 
-        if (running && activeTurnId && turns.has(activeTurnId) && !chosen.has(activeTurnId)) {
-          chosen.set(activeTurnId, null)
-        }
-
         for (const [turnId, row] of chosen) {
           const turn = turns.get(turnId)
           if (!turn) continue
-          const active = running && turnId === activeTurnId
-          if (!active && turn.totals.total <= 0 && turn.cost <= 0) {
-            const staleKey = `${session.id}:${turnId}`
-            const staleEntry = state.get(staleKey)
-            if (staleEntry) {
-              state.delete(staleKey)
-              if (staleEntry.dispose) staleEntry.dispose()
-              staleEntry.root.remove()
-            }
-            continue
-          }
           const key = `${session.id}:${turnId}`
           seen.add(key)
 
@@ -735,9 +666,7 @@ module.exports = Plugin.define({
             applyTurn(entry, turn, view, animate)
           }
 
-          const useLive = Boolean(active && liveHost)
-          entry.docked = useLive
-          const target = useLive ? liveHost : row ? contentTarget(row) : null
+          const target = row ? contentTarget(row) : null
           if (!target) continue
 
           if (
@@ -751,7 +680,7 @@ module.exports = Plugin.define({
           }
         }
 
-        if (hasSummary && liveHost) {
+        if (hasSummary && summaryHost) {
           const key = `${session.id}:__summary__`
           seen.add(key)
           let entry = state.get(key)
@@ -771,18 +700,16 @@ module.exports = Plugin.define({
             applyTurn(entry, summary, view, animate)
           }
 
-          if (entry.targetEl !== liveHost || entry.root.parentElement !== liveHost) {
-            liveHost.appendChild(entry.root)
-            entry.targetEl = liveHost
+          if (entry.targetEl !== summaryHost || entry.root.parentElement !== summaryHost) {
+            summaryHost.appendChild(entry.root)
+            entry.targetEl = summaryHost
             if (entry.isOpen()) entry.reposition()
           }
         }
       } finally {
         // Drop entries that no longer belong here. Same-session footers stay
-        // attached through a transient re-render, and the docked active turn
-        // stays in the composer dock while it is still running; a session
-        // switch, a finished turn, a reverted turn or a detached row removes
-        // them.
+        // attached through a transient re-render; a session switch, a reverted
+        // turn or a detached row removes them.
         for (const [key, entry] of state) {
           if (seen.has(key)) continue
           let stale = true
@@ -799,8 +726,6 @@ module.exports = Plugin.define({
             }
           }
           if (entry.sessionSummary && !known) stale = true
-          const turnId = key.slice(`${sessionId}:`.length)
-          if (entry.docked && running && turnId === activeTurnId) stale = false
           if (!stale) continue
           state.delete(key)
           if (entry.dispose) entry.dispose()
@@ -925,7 +850,6 @@ module.exports = Plugin.define({
       if (mutationTimer) clearTimeout(mutationTimer)
       if (frame !== undefined) cancelAnimationFrame(frame)
       if (observer) observer.disconnect()
-      if (queueObserver) queueObserver.disconnect()
       document.removeEventListener("visibilitychange", onVisibilityChange)
       for (const entry of state.values()) {
         if (entry.dispose) entry.dispose()

@@ -4,8 +4,13 @@
  * Pure data helpers for the token-usage footer.
  *
  * OpenCode stores one usage record per model request in `message.tokens`.
- * A visible "turn" starts at a user (or synthetic) message and contains one
- * or more assistant messages while the agent loops through tool calls.
+ * Recent builds delimit a turn with idle markers: everything between two idle
+ * markers is one turn, starting at the user message that opened it. Steers
+ * (`delivery: "steer"`) and queued prompts are inputs inside the running turn.
+ * Older transcripts, and the first window of a live session, can predate the
+ * first idle; until then every user message is its own turn. Synthetic and
+ * compaction notices are not turns themselves, but when one arrives with no
+ * open turn it owns the assistant usage that follows it.
  *
  * Total follows OpenCode's own definition:
  *   input + output + reasoning + cache.read + cache.write
@@ -164,6 +169,7 @@ function emptyTurn(id) {
     durationMs: 0,
     cacheHitRate: null,
     messageIds: [],
+    userIds: [],
   }
 }
 
@@ -182,18 +188,98 @@ function visibleMessages(messages, revertMessageID) {
 }
 
 /**
+ * Split the visible transcript into turns.
+ *
+ * From the first idle marker onward a turn is idle-delimited: it opens at a
+ * user message and closes at the next idle. A user message that arrives while
+ * a turn is open is a steer or a delivered queued prompt and belongs to that
+ * turn. Before the first idle there is no marker to end a turn, so the legacy
+ * rule applies: every non-pending user message starts a new turn. A user
+ * message whose id is still pending in the queue has not run yet, so it never
+ * opens a turn or joins one.
+ *
+ * Synthetic and compaction messages are notices. When they arrive with no open
+ * turn they open one under their own id, so assistant usage that follows (for
+ * example a subagent or background shell result) is still counted. A notice
+ * inside an open turn changes nothing. Compaction usage itself stays in the
+ * session ledger; only the assistant requests after it are folded in here.
+ *
+ * @param {Array} messages
+ * @param {string} [revertMessageID]
+ * @param {Set<string>|string[]} [pendingInputIDs] queued user messages not delivered yet
  * @returns {Map<string, ReturnType<typeof emptyTurn>>} turn id -> aggregate
  */
-function buildTurns(messages, revertMessageID) {
+function buildTurns(messages, revertMessageID, pendingInputIDs) {
   const turns = new Map()
+  const pending =
+    pendingInputIDs && typeof pendingInputIDs.has === "function"
+      ? pendingInputIDs
+      : Array.isArray(pendingInputIDs)
+        ? new Set(pendingInputIDs)
+        : null
+  const visible = visibleMessages(messages, revertMessageID)
+
+  // Precompute the first idle so the loop can pick the boundary rule per
+  // message. A window with no idle at all stays in legacy mode throughout.
+  let firstIdle = -1
+  for (let index = 0; index < visible.length; index += 1) {
+    const message = visible[index]
+    if (message && typeof message === "object" && message.type === "idle") {
+      firstIdle = index
+      break
+    }
+  }
+
   let current = null
 
-  for (const message of visibleMessages(messages, revertMessageID)) {
+  const openTurn = (id) => {
+    current = id
+    let turn = turns.get(id)
+    if (!turn) {
+      turn = emptyTurn(id)
+      turns.set(id, turn)
+    }
+    if (id && !turn.userIds.includes(id)) turn.userIds.push(id)
+    return turn
+  }
+
+  for (let index = 0; index < visible.length; index += 1) {
+    const message = visible[index]
     if (!message || typeof message !== "object") continue
 
-    if (message.type === "user" || message.type === "synthetic") {
-      current = message.id
-      if (!turns.has(current)) turns.set(current, emptyTurn(current))
+    if (message.type === "idle") {
+      if (!current) continue
+      const turn = turns.get(current)
+      if (turn) {
+        const created = finite(message.time && message.time.created)
+        if (created > 0 && created > turn.endedAt) turn.endedAt = created
+      }
+      current = null
+      continue
+    }
+
+    if (message.type === "system") continue
+
+    const idleMode = firstIdle !== -1 && index > firstIdle
+
+    if (message.type === "synthetic" || message.type === "compaction") {
+      // A notice only starts a turn when nothing is open; inside a turn it
+      // stays a notice. This captures orphan subagent/background usage
+      // without splitting a turn that is still running.
+      if (!current) openTurn(message.id)
+      continue
+    }
+
+    if (message.type === "user") {
+      if (pending && message.id && pending.has(message.id)) continue
+      if (idleMode && current) {
+        const turn = turns.get(current)
+        if (turn && message.id && !turn.userIds.includes(message.id)) {
+          turn.userIds.push(message.id)
+        }
+        continue
+      }
+      openTurn(message.id)
       continue
     }
 
@@ -234,9 +320,9 @@ function buildTurns(messages, revertMessageID) {
 }
 
 /**
- * Fold every completed turn into one synthetic footer payload. Turns with no
- * tokens and no cost (an empty steer or a failed request) are ignored so they
- * do not inflate the turn count.
+ * Fold every turn into one session payload. Turns with no tokens and no cost
+ * (a queued prompt that has not run, an empty steer or a failed request) are
+ * ignored, so an open turn still counts once it has usage.
  */
 function summarizeTurns(turns) {
   const totals = emptyTotals()
