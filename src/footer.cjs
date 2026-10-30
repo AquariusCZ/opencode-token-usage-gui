@@ -759,8 +759,13 @@ function bindTooltip(entry, view) {
     const inSurface = root.contains(target) || portal.contains(target)
     const onInfo = document.activeElement === info
     const hovering = root.matches(":hover") || portal.matches(":hover")
-    const plainTarget = target === document.body || target === document.documentElement
-    if (!inSurface && !onInfo && !hovering && !plainTarget) return
+    // Escape belongs to the app while it edits text or drives a dialog/menu.
+    const editing =
+      target.closest &&
+      target.closest(
+        'input, textarea, select, [contenteditable="true"], [contenteditable=""], [role="dialog"], [role="menu"], [role="listbox"]',
+      )
+    if (!inSurface && !onInfo && !hovering && editing) return
     event.stopPropagation()
     setPinned(false)
     hide(0)

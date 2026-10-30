@@ -38,8 +38,8 @@
 - Cost-only turns (reported cost with zero tokens) now get a footer instead of being dropped.
 - **Hardening.** The fallback stylesheet now survives a plugin reload; cleanup removes the live dock line; a docked
   footer survives a transient row absence; FX dates use the local timezone; malformed locales fall back to en-US;
-  the vertical-card hover bridge anchors to the info button. Added a no-fit placement test and a wrapped-footer
-  info-anchor test (31 tests).
+  the vertical-card hover bridge anchors to the info button; Escape is scoped away from text fields/dialogs. Added a
+  no-fit placement test and a wrapped-footer info-anchor test (31 tests).
 - Refreshed the interactive mock and screenshot; added an in-page light/dark toggle.
 
 ## 0.2.2 — 2026-10-30
