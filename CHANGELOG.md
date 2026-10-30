@@ -11,6 +11,7 @@
 - New `sampleMs` (50–1000, default 100) and `smoothMs` (50–2000, default 250) options.
 - Measured CPU on a ~200-message session: continuous ~2.7% of one core, interval 500 ms ~1.6%, 60 Hz polling
   ~12.7%. Continuous keeps the 60 Hz animation without 60 Hz store polling.
+- 18 unit tests; CI green.
 
 ## 0.2.0 — 2026-10-30
 
