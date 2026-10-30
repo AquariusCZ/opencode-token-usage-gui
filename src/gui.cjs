@@ -207,6 +207,23 @@ const hasVisibleQueue = (scroll) => {
   )
 }
 
+/**
+ * True while the session has a prompt waiting to run, whether or not its queue
+ * panel is mounted or visible (closed dock, a question/elicitation blocking the
+ * composer). Synthetic prompts are not user work and do not count.
+ */
+const hasPendingQueue = (session) => {
+  const data = session && session.server && session.server.data
+  const api = data && data.session && data.session.pending
+  if (!api || typeof api.list !== "function") return false
+  try {
+    const items = api.list(session.id)
+    return Array.isArray(items) && items.some((item) => item && item.type !== "synthetic")
+  } catch {
+    return false
+  }
+}
+
 function contentTarget(row) {
   return (
     row.closest('[data-slot="session-turn-assistant-content"]') ||
@@ -417,6 +434,42 @@ module.exports = Plugin.define({
     }
 
     /**
+     * Queue rows live in the composer dock, outside the timeline observer.
+     * Watching the dock subtree makes a queued prompt appearing or disappearing
+     * refresh the summary within the same debounce instead of the idle sample.
+     */
+    let queueObserver = null
+    let observedDock = null
+    const onDockMutation = () => {
+      if (mutationTimer) return
+      mutationTimer = setTimeout(() => {
+        mutationTimer = undefined
+        refresh()
+      }, MUTATION_DELAY_MS)
+    }
+    const observeDock = () => {
+      if (typeof MutationObserver === "undefined") return
+      if (!queueObserver) queueObserver = new MutationObserver(onDockMutation)
+      const dock = document.querySelector('[data-component="session-composer-dock"]')
+      if (!dock) {
+        if (observedDock) {
+          queueObserver.disconnect()
+          observedDock = null
+        }
+        return
+      }
+      if (observedDock === dock) return
+      queueObserver.disconnect()
+      observedDock = dock
+      queueObserver.observe(dock, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["hidden", "style", "class"],
+      })
+    }
+
+    /**
      * The active turn's capsule lives in the composer dock as the first flow
      * child of the z-70 column: above the queued-message panel and the
      * composer morph. The queue panel's negative margin tucks it under the
@@ -534,6 +587,7 @@ module.exports = Plugin.define({
         const scroll = findScroll()
         if (!scroll) return
         observe(scroll)
+        observeDock()
 
         const statusApi = data.session && data.session.status
         running = false
@@ -548,6 +602,7 @@ module.exports = Plugin.define({
         const hasSummary =
           !running &&
           !hasVisibleQueue(scroll) &&
+          !hasPendingQueue(session) &&
           (summary.totals.total > 0 || summary.cost > 0)
         const liveHost = running || hasSummary ? ensureLiveHost(scroll) : null
 
@@ -801,6 +856,7 @@ module.exports = Plugin.define({
       if (mutationTimer) clearTimeout(mutationTimer)
       if (frame !== undefined) cancelAnimationFrame(frame)
       if (observer) observer.disconnect()
+      if (queueObserver) queueObserver.disconnect()
       document.removeEventListener("visibilitychange", onVisibilityChange)
       for (const entry of state.values()) {
         if (entry.dispose) entry.dispose()

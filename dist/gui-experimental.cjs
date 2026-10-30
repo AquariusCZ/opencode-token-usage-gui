@@ -1344,6 +1344,17 @@ var hasVisibleQueue = (scroll) => {
     (element) => isVisible(element) && Boolean(element.querySelector('[data-component="session-queue-row"]'))
   );
 };
+var hasPendingQueue = (session) => {
+  const data = session && session.server && session.server.data;
+  const api = data && data.session && data.session.pending;
+  if (!api || typeof api.list !== "function") return false;
+  try {
+    const items = api.list(session.id);
+    return Array.isArray(items) && items.some((item) => item && item.type !== "synthetic");
+  } catch {
+    return false;
+  }
+};
 function contentTarget(row) {
   return row.closest('[data-slot="session-turn-assistant-content"]') || row.querySelector('[data-slot="session-turn-assistant-content"]') || row.closest('[data-slot="session-turn-message-container"]') || row.querySelector('[data-slot="session-turn-message-content"]') || row;
 }
@@ -1517,6 +1528,36 @@ module.exports = Plugin.define({
       observedScroll = scroll;
       observer.observe(scroll, { childList: true, subtree: true });
     };
+    let queueObserver = null;
+    let observedDock = null;
+    const onDockMutation = () => {
+      if (mutationTimer) return;
+      mutationTimer = setTimeout(() => {
+        mutationTimer = void 0;
+        refresh();
+      }, MUTATION_DELAY_MS);
+    };
+    const observeDock = () => {
+      if (typeof MutationObserver === "undefined") return;
+      if (!queueObserver) queueObserver = new MutationObserver(onDockMutation);
+      const dock = document.querySelector('[data-component="session-composer-dock"]');
+      if (!dock) {
+        if (observedDock) {
+          queueObserver.disconnect();
+          observedDock = null;
+        }
+        return;
+      }
+      if (observedDock === dock) return;
+      queueObserver.disconnect();
+      observedDock = dock;
+      queueObserver.observe(dock, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["hidden", "style", "class"]
+      });
+    };
     const ensureLiveHost = (scroll) => {
       const face = findComposerFace(scroll);
       const morph = face && face.parentElement;
@@ -1606,6 +1647,7 @@ module.exports = Plugin.define({
         const scroll = findScroll();
         if (!scroll) return;
         observe(scroll);
+        observeDock();
         const statusApi = data.session && data.session.status;
         running = false;
         if (typeof statusApi === "function") {
@@ -1617,7 +1659,7 @@ module.exports = Plugin.define({
         const turnIds = Array.from(turns.keys());
         activeTurnId = running ? turnIds[turnIds.length - 1] : null;
         const summary = summarizeTurns(turns);
-        const hasSummary = !running && !hasVisibleQueue(scroll) && (summary.totals.total > 0 || summary.cost > 0);
+        const hasSummary = !running && !hasVisibleQueue(scroll) && !hasPendingQueue(session) && (summary.totals.total > 0 || summary.cost > 0);
         const liveHost = running || hasSummary ? ensureLiveHost(scroll) : null;
         const byMessage = /* @__PURE__ */ new Map();
         known = new Set(turns.keys());
@@ -1835,6 +1877,7 @@ module.exports = Plugin.define({
       if (mutationTimer) clearTimeout(mutationTimer);
       if (frame !== void 0) cancelAnimationFrame(frame);
       if (observer) observer.disconnect();
+      if (queueObserver) queueObserver.disconnect();
       document.removeEventListener("visibilitychange", onVisibilityChange);
       for (const entry of state.values()) {
         if (entry.dispose) entry.dispose();
