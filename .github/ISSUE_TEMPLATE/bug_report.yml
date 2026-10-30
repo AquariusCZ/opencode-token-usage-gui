@@ -1,0 +1,95 @@
+name: Bug report
+description: Something is broken, missing, or the footer landed in the wrong place.
+title: "[bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. The plugin injects a footer into the desktop UI, so the app version and a screenshot
+        are usually what make a fix possible. Please do not paste API keys or full session transcripts.
+
+  - type: input
+    id: opencode-version
+    attributes:
+      label: OpenCode version
+      description: Desktop app version, e.g. 2.2.3. If you know the CLI version too, add it.
+      placeholder: "2.2.3"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      placeholder: "Windows 11, macOS 15.3, Ubuntu 24.04"
+    validations:
+      required: true
+
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin version or commit
+      description: The version shown in the footer/README, or the commit installed from GitHub.
+      placeholder: "0.3.0 / 9dfb763"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install-method
+    attributes:
+      label: Install method
+      options:
+        - "opencode plugin add github:AquariusCZ/opencode-token-usage-gui"
+        - Manual git clone into the plugins directory
+        - Local development directory
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: options
+    attributes:
+      label: Plugin options
+      description: Paste the plugin entry from opencode.json(c), with secrets removed.
+      render: json
+      placeholder: |
+        {
+          "currency": "CNY",
+          "popoverSide": "left"
+        }
+    validations:
+      required: false
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What happened instead? Include the exact text if a number looks wrong.
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshot
+      description: |
+        A screenshot of the turn and the capsule helps most. Relevant lines from
+        `~/.local/share/opencode/log/opencode.log` (search for `token-usage-gui`) are also useful.
+      render: text
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: desktop-v2
+    attributes:
+      label: Desktop app
+      options:
+        - label: I am using OpenCode Desktop V2 (not the TUI).
+          required: true

@@ -454,6 +454,10 @@ For local development, copy `dist/gui-experimental.cjs` into your plugin directo
 plugin at the repo directory and reload. The app watches the built file and reloads the GUI for local plugin
 directories.
 
+## Community
+
+Questions / launch feedback: [OpenCode Discord](https://opencode.ai/discord) · [Issues](https://github.com/AquariusCZ/opencode-token-usage-gui/issues)
+
 ## Contributing
 
 - Open an issue for bugs, selector breakage, or feature requests.

@@ -1,0 +1,44 @@
+name: Feature request
+description: Suggest a number, interaction, option or integration.
+title: "[feature] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The plugin stays small on purpose: per-turn attribution first, no telemetry, no runtime dependencies.
+        Proposals that fit that shape are the easiest to accept.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do that the plugin does not support today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What should it do? If it is a UI change, a rough sketch or screenshot helps.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Existing options, another plugin, a manual workaround, or doing nothing.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: willing-to-pr
+    attributes:
+      label: Willing to open a PR?
+      options:
+        - "Yes"
+        - "Maybe, with guidance"
+        - "No"
+    validations:
+      required: true

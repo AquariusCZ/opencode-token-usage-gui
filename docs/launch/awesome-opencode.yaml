@@ -1,0 +1,19 @@
+name: OpenCode Token Usage
+repo: https://github.com/AquariusCZ/opencode-token-usage-gui
+tagline: Per-turn token, cache-hit and RMB cost capsules for every OpenCode Desktop V2 reply.
+description: >-
+  A zero-config GUI plugin for OpenCode Desktop V2. Shows one capsule per turn with input/output,
+  cache reads and hit rate, total tokens and RMB cost; a live capsule follows thinking/tool work in the
+  composer dock, and a session-wide summary appears when the session is idle with no pending work.
+  Hover for a theme-native breakdown card with a composition bar, six metrics, requests, active time and
+  exchange-rate source. Configurable left/right popover, compact/detailed modes, zero runtime dependencies,
+  no network unless the optional auto FX rate is enabled. Install with
+  `opencode plugin add github:AquariusCZ/opencode-token-usage-gui`.
+scope:
+  - global
+tags:
+  - observability
+  - token-usage
+  - cost-tracking
+  - desktop
+  - gui
