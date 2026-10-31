@@ -65,14 +65,13 @@ Do these in order. Posting before the release page matches the code is the most 
       This is the single highest-value pre-launch task.
 - [x] **Enable GitHub Discussions.** Settings → General → Features → Discussions. Create a "Show and tell" category
       if it does not exist.
-- [ ] **Re-upload the social preview (0.3.1).** Settings → General → Social preview → upload
-      `assets/social-preview.png` (1280×640). GitHub has no API for this field.
+- [x] **Re-upload the social preview (0.3.1).** Uploaded 1280×640; GitHub's `og:image` and `twitter:image`
+      point to the new image.
 - [ ] **Confirm issue templates render.** Open `/issues/new/choose` and check the two forms and the contact link.
 - [x] **Re-read the README top.** It should state the V2 requirement, the install command and the mock disclaimer
       within the first screen.
 
-Remaining manual steps: replace the illustrative mock with a real capture, confirm the issue templates render, and
-re-upload the refreshed social preview (GitHub has no API for that field).
+Remaining manual steps: replace the illustrative mock with a real capture, and confirm the issue templates render.
 
 ## 4. Channel plan
 
