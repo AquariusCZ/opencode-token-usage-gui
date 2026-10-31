@@ -67,11 +67,12 @@ Do these in order. Posting before the release page matches the code is the most 
       if it does not exist.
 - [x] **Re-upload the social preview (0.3.1).** Uploaded 1280×640; GitHub's `og:image` and `twitter:image`
       point to the new image.
-- [ ] **Confirm issue templates render.** Open `/issues/new/choose` and check the two forms and the contact link.
+- [x] **Confirm issue templates render.** Checked 2026-10-30: Bug report and Feature request both render; the
+      Discord/docs contact links work; blank issues are maintainers-only.
 - [x] **Re-read the README top.** It should state the V2 requirement, the install command and the mock disclaimer
       within the first screen.
 
-Remaining manual steps: replace the illustrative mock with a real capture, and confirm the issue templates render.
+Remaining manual step: replace the illustrative mock with a real capture.
 
 ## 4. Channel plan
 
